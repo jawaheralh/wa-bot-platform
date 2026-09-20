@@ -35,6 +35,14 @@ export async function createServer(app: App): Promise<FastifyInstance> {
     await reply.code(status).send({ error: errorMessage(error) });
   });
 
+  /* --- webhook مزوّد Cloud API: قبل حارس المصادقة، فالمتصل هو Meta --- */
+  if (provider.name === 'cloud') {
+    const { registerCloudWebhook, CloudApiProvider } = await import('../whatsapp/cloud-api.ts');
+    if (provider instanceof CloudApiProvider) {
+      registerCloudWebhook(server, provider, config, logger);
+    }
+  }
+
   server.get('/api/health', async () => ({ ok: true, provider: provider.name }));
 
   /* --- الجلسة --- */

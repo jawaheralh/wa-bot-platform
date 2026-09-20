@@ -56,16 +56,36 @@ export interface WhatsAppProvider {
 --------------------------------------------------------------- */
 
 /**
+ * خطأ لا فائدة من تكراره — طلب خاطئ، توكن منتهٍ، رقم غير صالح.
+ * المستدعي يضع هذه العلامة، و withRetry تستسلم فوراً بدل إهدار ثلاث
+ * محاولات وحدّ معدّل على خطأ لن يتغير.
+ */
+export function markNoRetry<E extends object>(error: E): E & { noRetry: true } {
+  return Object.assign(error, { noRetry: true as const });
+}
+
+export function isNoRetry(error: unknown): boolean {
+  return (error as { noRetry?: boolean })?.noRetry === true;
+}
+
+/**
  * تراجع أسّي مع تشويش بسيط.
  * فشل الإرسال شائع ومؤقت (انقطاع socket، حدّ معدّل من Meta)، وخسارة رد
  * البوت تعني عميلاً ينتظر بلا جواب — فالمحاولة أرخص من الصمت.
  */
 export async function withRetry<T>(
   operation: () => Promise<T>,
-  options: { attempts?: number; baseDelayMs?: number; onRetry?: (attempt: number, error: unknown) => void } = {},
+  options: {
+    attempts?: number;
+    baseDelayMs?: number;
+    onRetry?: (attempt: number, error: unknown) => void;
+    /** افتراضياً: أعد المحاولة إلا إذا وُسم الخطأ بـnoRetry. */
+    shouldRetry?: (error: unknown) => boolean;
+  } = {},
 ): Promise<T> {
   const attempts = options.attempts ?? 3;
   const baseDelay = options.baseDelayMs ?? 500;
+  const shouldRetry = options.shouldRetry ?? ((error: unknown) => !isNoRetry(error));
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
@@ -73,7 +93,7 @@ export async function withRetry<T>(
       return await operation();
     } catch (error) {
       lastError = error;
-      if (attempt === attempts) break;
+      if (attempt === attempts || !shouldRetry(error)) break;
       options.onRetry?.(attempt, error);
       const delay = baseDelay * 2 ** (attempt - 1) + Math.floor(Math.random() * 200);
       await new Promise((resolve) => setTimeout(resolve, delay));

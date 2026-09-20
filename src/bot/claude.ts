@@ -8,7 +8,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { ToolDefinition } from '../modules/types.ts';
 import type { Logger } from '../logger.ts';
-import { withRetry } from '../whatsapp/provider.ts';
+import { withRetry, markNoRetry } from '../whatsapp/provider.ts';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -66,7 +66,7 @@ export function createClaudeClient(apiKey: string, model: string, logger: Logger
             });
           } catch (error) {
             // خطأ في الطلب نفسه (٤٠٠) لا يُصلحه التكرار — نرميه فوراً.
-            if (!isRetryable(error)) throw Object.assign(new Error(String(error)), { noRetry: true, cause: error });
+            if (!isRetryable(error)) throw markNoRetry(new Error(String(error), { cause: error }));
             throw error;
           }
         },
