@@ -13,6 +13,7 @@ import { SQL_NOW } from '../time.ts';
 import { inquiriesModule } from './inquiries.ts';
 import { complaintsModule } from './complaints.ts';
 import { handoffModule } from './handoff.ts';
+import { bookingsModule } from './bookings.ts';
 
 /* ===============================================================
    الوحدات المسجّلة
@@ -21,7 +22,7 @@ import { handoffModule } from './handoff.ts';
    هذه القائمة. لا شيء آخر في المشروع يُعدَّل — الجداول والتفعيل وتجميع
    الأدوات والـprompt وتوجيه النداءات كلها تعمل تلقائياً بعدها.
    =============================================================== */
-export const MODULES: BotModule[] = [inquiriesModule, complaintsModule, handoffModule];
+export const MODULES: BotModule[] = [inquiriesModule, complaintsModule, handoffModule, bookingsModule];
 
 /**
  * البحث خطّي عن قصد: الوحدات عشرات لا آلاف، وخريطة تُبنى مرة عند الاستيراد

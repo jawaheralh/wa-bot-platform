@@ -14,6 +14,7 @@ import { createClaudeClient, type ClaudeClient } from './bot/claude.ts';
 import { createEngine } from './bot/engine.ts';
 import { createTranscriber } from './stt/index.ts';
 import { createServer } from './web/server.ts';
+import { startScheduler } from './scheduler.ts';
 
 /** بديل يوقف الردود بوضوح بدل أن يفشل الإقلاع كله. */
 function disabledClaude(logger: Logger): ClaudeClient {
@@ -60,12 +61,15 @@ async function main(): Promise<void> {
 
   await provider.start();
 
+  const stopScheduler = startScheduler(app);
+
   const server = await createServer(app);
   await server.listen({ port: config.port, host: config.host });
   logger.info(`لوحة التحكم جاهزة على http://${config.host}:${config.port}`);
 
   const shutdown = async (signal: string): Promise<void> => {
     logger.info(`إيقاف التشغيل (${signal})`);
+    stopScheduler();
     await server.close();
     await app.close();
     process.exit(0);
