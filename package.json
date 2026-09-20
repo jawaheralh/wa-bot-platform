@@ -1,0 +1,37 @@
+{
+  "name": "wa-bot-platform",
+  "version": "0.1.0",
+  "description": "منصة بوت واتساب ذكي متعددة المنشآت — وحدات تُفعّل لكل عميل",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "node --watch src/index.ts",
+    "start": "node src/index.ts",
+    "seed": "node src/seed.ts",
+    "sim": "node src/sim.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.127.0",
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/formbody": "^9.0.0",
+    "@fastify/static": "^10.1.4",
+    "@whiskeysockets/baileys": "7.0.0-rc14",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^13.0.3",
+    "fastify": "^5.12.5",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.0.0",
+    "@types/qrcode-terminal": "^0.12.2",
+    "typescript": "^5.9.0",
+    "vitest": "^5.0.1"
+  }
+}
