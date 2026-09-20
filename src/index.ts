@@ -9,10 +9,21 @@
 import { buildApp } from './app.ts';
 import { listTenants } from './db/index.ts';
 import { MODULES } from './modules/registry.ts';
-import { errorMessage } from './logger.ts';
-import { createClaudeClient } from './bot/claude.ts';
+import { errorMessage, type Logger } from './logger.ts';
+import { createClaudeClient, type ClaudeClient } from './bot/claude.ts';
 import { createEngine } from './bot/engine.ts';
 import { createTranscriber } from './stt/index.ts';
+import { createServer } from './web/server.ts';
+
+/** بديل يوقف الردود بوضوح بدل أن يفشل الإقلاع كله. */
+function disabledClaude(logger: Logger): ClaudeClient {
+  logger.warn('ANTHROPIC_API_KEY غير معرّف — لوحة التحكم تعمل، لكن البوت لن يرد على العملاء.');
+  return {
+    async chat() {
+      throw new Error('ANTHROPIC_API_KEY غير معرّف.');
+    },
+  };
+}
 
 async function main(): Promise<void> {
   const app = await buildApp();
@@ -30,7 +41,11 @@ async function main(): Promise<void> {
     logger.warn('لا توجد منشآت بعد — شغّلي «npm run seed» لإنشاء منشأة تجريبية.');
   }
 
-  const claude = createClaudeClient(config.anthropicApiKey, config.anthropicModel, logger);
+  // بلا مفتاح لا يستطيع البوت الرد، لكن لوحة التحكم يجب أن تعمل: الأدمن
+  // يحتاجها لإدخال المعرفة وإضافة المنشآت قبل أن يصل أول عميل.
+  const claude = config.anthropicApiKey
+    ? createClaudeClient(config.anthropicApiKey, config.anthropicModel, logger)
+    : disabledClaude(logger);
   const transcriber = createTranscriber(config, logger);
   const engine = createEngine({ app, claude, transcriber });
 
@@ -45,8 +60,13 @@ async function main(): Promise<void> {
 
   await provider.start();
 
+  const server = await createServer(app);
+  await server.listen({ port: config.port, host: config.host });
+  logger.info(`لوحة التحكم جاهزة على http://${config.host}:${config.port}`);
+
   const shutdown = async (signal: string): Promise<void> => {
     logger.info(`إيقاف التشغيل (${signal})`);
+    await server.close();
     await app.close();
     process.exit(0);
   };

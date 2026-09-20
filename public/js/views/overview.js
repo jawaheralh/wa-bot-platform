@@ -1,0 +1,80 @@
+/** نظرة عامة على المنشأة: أرقام سريعة وحالة الاتصال. */
+
+import { get, post, esc, el, guard } from '../core.js';
+import { state } from '../core.js';
+
+export async function renderOverview(main) {
+  const data = await get(`/api/tenants/${state.tenantId}`);
+  const { tenant, stats, connection, modules } = data;
+
+  const enabled = modules.filter((m) => m.enabled);
+  const disabled = modules.filter((m) => !m.enabled);
+
+  main.innerHTML = `
+    <h2>${esc(tenant.name)}</h2>
+    <p class="subtitle">
+      الرقم <span class="num">${esc(tenant.wa_number)}</span> ·
+      النبرة ${tenant.tone === 'formal' ? 'رسمية' : 'ودّية'} ·
+      ${tenant.status === 'active' ? '<span class="badge green">نشطة</span>' : '<span class="badge red">موقوفة</span>'}
+    </p>
+
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-label">المحادثات</div><div class="kpi-value">${stats.conversations}</div></div>
+      <div class="kpi"><div class="kpi-label">شكاوى جديدة</div><div class="kpi-value">${stats.newComplaints}</div></div>
+      <div class="kpi"><div class="kpi-label">تحويلات مفتوحة</div><div class="kpi-value">${stats.openHandoffs}</div></div>
+      <div class="kpi"><div class="kpi-label">تنبيهات غير مقروءة</div><div class="kpi-value">${stats.unseenAlerts}</div></div>
+    </div>
+
+    <div class="card">
+      <h3>حالة الاتصال بواتساب</h3>
+      <p class="muted">المزوّد: <span class="num">${esc(connection.provider)}</span> —
+        ${connection.connected ? '<span class="badge green">متصل</span>' : '<span class="badge amber">غير متصل</span>'}
+        ${connection.detail ? ` · ${esc(connection.detail)}` : ''}</p>
+      ${connection.qr ? `<div id="qr" class="qr"></div>` : ''}
+    </div>
+
+    <div class="card">
+      <h3>الوحدات المفعّلة</h3>
+      <p class="muted">${enabled.map((m) => esc(m.titleAr)).join(' · ') || 'لا شيء'}</p>
+      ${disabled.length ? `<p class="muted">غير مفعّلة: ${disabled.map((m) => esc(m.titleAr)).join(' · ')}</p>` : ''}
+    </div>
+
+    <div class="card">
+      <h3>آخر التنبيهات</h3>
+      <div id="alerts" class="empty">جارٍ التحميل…</div>
+    </div>
+  `;
+
+  if (connection.qr) {
+    // نعرض الرمز كنص؛ المسح يتم من الطرفية حيث يُطبع مرسوماً.
+    document.getElementById('qr').textContent = connection.qr;
+  }
+
+  const alerts = await get(`/api/tenants/${state.tenantId}/alerts`);
+  const box = document.getElementById('alerts');
+  if (!alerts.length) {
+    box.textContent = 'لا توجد تنبيهات.';
+    return;
+  }
+  box.classList.remove('empty');
+  box.innerHTML = `
+    <div class="table-wrap"><table>
+      <thead><tr><th>التنبيه</th><th>التفاصيل</th><th>الوقت</th></tr></thead>
+      <tbody>${alerts
+        .slice(0, 15)
+        .map(
+          (a) => `<tr>
+            <td>${a.seen ? '' : '<span class="badge red">جديد</span> '}${esc(a.title)}</td>
+            <td class="muted">${esc(a.body).replace(/\n/g, '<br>')}</td>
+            <td class="num muted">${esc(a.created_at.slice(5, 16))}</td>
+          </tr>`,
+        )
+        .join('')}</tbody>
+    </table></div>
+    <div class="actions"><button class="btn ghost small" id="seen">تعليم الكل كمقروء</button></div>
+  `;
+  document.getElementById('seen').onclick = guard(async () => {
+    await post(`/api/tenants/${state.tenantId}/alerts/seen`);
+    renderOverview(main);
+  });
+}

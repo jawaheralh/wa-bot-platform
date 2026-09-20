@@ -1,0 +1,163 @@
+/* ===============================================================
+   نظام التصميم
+   ألوان واتساب الخضراء مع رمادي هادئ — الواجهة أداة عمل يومية
+   لموظف، لا صفحة تسويق.
+   =============================================================== */
+
+:root {
+  --green: #128c7e;
+  --green-dark: #075e54;
+  --green-light: #dcf8c6;
+  --ink: #1f2933;
+  --muted: #6b7684;
+  --line: #e3e7ec;
+  --bg: #f4f6f8;
+  --card: #ffffff;
+  --danger: #c0392b;
+  --warn: #b7791f;
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
+  --sidebar-w: 240px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "SF Arabic", "Geeza Pro", "Segoe UI", "Noto Sans Arabic", Tahoma, sans-serif;
+  direction: rtl;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+/* الأرقام دائماً لاتينية ومن اليسار لليمين حتى داخل نص عربي */
+.num, td.num, .mono, .kpi-value {
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline-block;
+}
+
+a { color: var(--green); }
+button { font-family: inherit; font-size: inherit; }
+
+/* --- التخطيط --- */
+.layout { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: var(--sidebar-w);
+  flex: 0 0 var(--sidebar-w);
+  background: var(--green-dark);
+  color: #fff;
+  padding: 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sidebar h1 { font-size: 17px; margin: 0 0 4px; }
+.sidebar .who { font-size: 13px; opacity: 0.75; margin-bottom: 16px; }
+.sidebar nav { display: flex; flex-direction: column; gap: 2px; }
+.sidebar nav button {
+  background: transparent; border: 0; color: #fff; text-align: right;
+  padding: 9px 12px; border-radius: 8px; cursor: pointer; opacity: 0.85;
+}
+.sidebar nav button:hover { background: rgba(255, 255, 255, 0.12); opacity: 1; }
+.sidebar nav button.active { background: var(--green); opacity: 1; font-weight: 600; }
+.sidebar .spacer { flex: 1; }
+.sidebar select {
+  width: 100%; padding: 8px; border-radius: 8px; border: 0;
+  font-family: inherit; margin-bottom: 14px;
+}
+
+main { flex: 1; padding: 22px 26px; min-width: 0; }
+h2 { margin: 0 0 4px; font-size: 21px; }
+.subtitle { color: var(--muted); margin: 0 0 18px; font-size: 14px; }
+
+/* --- البطاقات --- */
+.card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);
+  margin-bottom: 14px;
+}
+.card h3 { margin: 0 0 10px; font-size: 16px; }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+
+.kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin-bottom: 18px; }
+.kpi { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+.kpi-label { color: var(--muted); font-size: 13px; }
+.kpi-value { font-size: 26px; font-weight: 700; color: var(--green-dark); }
+
+/* --- الجداول --- */
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 13px; }
+tbody tr:hover { background: #fafbfc; }
+.table-wrap { overflow-x: auto; }
+
+/* --- الأزرار --- */
+.btn {
+  background: var(--green); color: #fff; border: 0; border-radius: 8px;
+  padding: 8px 14px; cursor: pointer;
+}
+.btn:hover { background: var(--green-dark); }
+.btn.ghost { background: transparent; color: var(--green); border: 1px solid var(--line); }
+.btn.ghost:hover { background: #f0f4f4; }
+.btn.danger { background: var(--danger); }
+.btn.small { padding: 4px 10px; font-size: 13px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* --- الحقول --- */
+label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+input, select, textarea {
+  width: 100%; padding: 9px 10px; border: 1px solid var(--line);
+  border-radius: 8px; font-family: inherit; font-size: 15px; background: #fff; color: var(--ink);
+}
+textarea { min-height: 90px; resize: vertical; line-height: 1.7; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--green); outline-offset: -1px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.row > * { flex: 1; min-width: 180px; }
+.actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+
+/* --- الشارات --- */
+.badge {
+  display: inline-block; padding: 2px 9px; border-radius: 999px;
+  font-size: 12px; background: #eef1f4; color: var(--muted); white-space: nowrap;
+}
+.badge.green { background: #e4f5ec; color: #1e7a4c; }
+.badge.red { background: #fdecea; color: var(--danger); }
+.badge.amber { background: #fdf3e2; color: var(--warn); }
+.badge.grey { background: #eef1f4; color: var(--muted); }
+
+/* --- الوحدات --- */
+.module { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; background: var(--card); }
+.module h4 { margin: 0 0 4px; font-size: 16px; }
+.module p { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+.module.off { background: #f7f8f9; border-style: dashed; }
+.module.off h4, .module.off p { color: #9aa3ad; }
+.module .locked {
+  background: #fff; border: 1px dashed var(--line); border-radius: 8px;
+  padding: 10px; font-size: 13px; color: var(--muted); margin-top: 8px;
+}
+
+/* --- المحادثة --- */
+.chat { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; padding: 6px; }
+.bubble { max-width: 74%; padding: 8px 12px; border-radius: 12px; white-space: pre-wrap; word-break: break-word; }
+.bubble .meta { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; direction: ltr; text-align: left; }
+.bubble.customer { align-self: flex-start; background: #fff; border: 1px solid var(--line); }
+.bubble.bot { align-self: flex-end; background: var(--green-light); }
+.bubble.staff { align-self: flex-end; background: #fff3cd; }
+
+/* --- متفرقات --- */
+.empty { color: var(--muted); text-align: center; padding: 30px; }
+.error { background: #fdecea; color: var(--danger); padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
+.ok { background: #e4f5ec; color: #1e7a4c; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
+.qr { font-family: ui-monospace, Menlo, monospace; font-size: 8px; line-height: 8px; white-space: pre; direction: ltr; }
+.muted { color: var(--muted); font-size: 13px; }
+
+@media (max-width: 760px) {
+  .layout { flex-direction: column; }
+  .sidebar { width: 100%; flex: none; }
+  main { padding: 16px; }
+}
