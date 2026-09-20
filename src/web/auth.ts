@@ -9,6 +9,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 // الاستيراد لازم لأنواع الكوكي التي يضيفها الملحق لـrequest و reply.
 import '@fastify/cookie';
+import type { Role } from '../staff.ts';
 import { findUser, verifyPassword } from '../tenants.ts';
 import type { Db, UserRow } from '../db/index.ts';
 
@@ -18,7 +19,7 @@ export interface SessionUser {
   id: number;
   username: string;
   displayName: string;
-  role: 'system' | 'tenant';
+  role: Role;
   tenantId: number | null;
 }
 
@@ -59,15 +60,22 @@ export function readSession(db: Db, request: FastifyRequest): SessionUser | unde
   const unsigned = request.unsignCookie(raw);
   if (!unsigned.valid || !unsigned.value) return undefined;
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(unsigned.value)) as UserRow | undefined;
-  return user ? toSession(user) : undefined;
+  // حساب عُطّل أثناء جلسة مفتوحة يجب أن يسقط فوراً لا عند انتهاء الكوكي.
+  if (!user || user.active === 0) return undefined;
+  return toSession(user);
 }
 
 export function login(db: Db, username: string, password: string): UserRow {
   const user = findUser(db, username);
   // نفس الرسالة في الحالتين حتى لا نكشف أي أسماء مستخدمين موجودة.
-  const invalid = new Error('اسم المستخدم أو كلمة المرور غير صحيحة.');
+  // و401 لا 500: فشل الدخول حدث متوقع، ولو عاد 500 لاختلط بأعطال الخادم
+  // في السجل والمراقبة، ولتعذّر بناء تحديد معدّل عليه لاحقاً.
+  const invalid = Object.assign(new Error('اسم المستخدم أو كلمة المرور غير صحيحة.'), { statusCode: 401 });
   if (!user) throw invalid;
   if (!verifyPassword(password, user.password_hash)) throw invalid;
+  if (user.active === 0) {
+    throw Object.assign(new Error('هذا الحساب معطَّل. راجعي مالك المنشأة.'), { statusCode: 403 });
+  }
   return user;
 }
 
@@ -109,4 +117,17 @@ export function requireTenantAccess(request: FastifyRequest, tenantId: number): 
     throw Object.assign(new Error('لا تملك صلاحية على هذه المنشأة.'), { statusCode: 403 });
   }
   return tenantId;
+}
+
+
+/**
+ * إدارة الموظفين وقاعدة المعرفة وإعدادات الوحدات لمالك المنشأة فقط.
+ * الموظف (agent) يمرّ من requireTenantAccess لكنه يُمنع هنا.
+ */
+export function requireTenantAdmin(request: FastifyRequest, tenantId: number): number {
+  const user = request.user;
+  if (!user) throw Object.assign(new Error('يلزم تسجيل الدخول.'), { statusCode: 401 });
+  if (user.role === 'system') return tenantId;
+  if (user.role === 'tenant' && user.tenantId === tenantId) return tenantId;
+  throw Object.assign(new Error('هذه الصلاحية لمالك المنشأة فقط.'), { statusCode: 403 });
 }

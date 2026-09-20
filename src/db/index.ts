@@ -9,7 +9,7 @@
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { CORE_TABLES } from './schema.ts';
+import { CORE_TABLES, CORE_COLUMNS } from './schema.ts';
 import { SQL_NOW, today } from '../time.ts';
 
 export type Db = Database.Database;
@@ -21,7 +21,25 @@ export function openDb(path: string): Db {
   db.pragma('foreign_keys = ON');
   db.pragma('busy_timeout = 5000');
   for (const statement of CORE_TABLES) db.exec(statement);
+  for (const [table, column, definition] of CORE_COLUMNS) ensureColumn(db, table, column, definition);
   return db;
+}
+
+/**
+ * إضافة عمود لجدول قائم.
+ *
+ * CREATE TABLE IF NOT EXISTS لا يضيف أعمدة لجدول موجود، فقاعدة أُنشئت قبل
+ * إضافة ميزة تبقى ناقصة بصمت. هذه الدالة تسدّ ذلك: تقرأ أعمدة الجدول
+ * فعلياً وتضيف الناقص، فتعمل على القاعدة الجديدة والقديمة سواء.
+ *
+ * تُصدَّر لأن الوحدات تحتاجها أيضاً حين تضيف عموداً لجدول أصدرته سابقاً.
+ */
+export function ensureColumn(db: Db, table: string, column: string, definition: string): void {
+  const exists = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(table);
+  if (!exists) return;
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (columns.some((c) => c.name === column)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 
 /* ---------------------------------------------------------------
@@ -70,6 +88,10 @@ export interface ConversationRow {
   bot_enabled: number;
   silent_until: string | null;
   handoff_reason: string | null;
+  assigned_to: number | null;
+  assigned_at: string | null;
+  viewing_user_id: number | null;
+  viewing_at: string | null;
   last_message_at: string | null;
   created_at: string;
 }
@@ -78,6 +100,7 @@ export interface MessageRow {
   id: number;
   conversation_id: number;
   role: 'customer' | 'bot' | 'staff' | 'system';
+  user_id: number | null;
   body: string;
   media_type: string | null;
   wa_message_id: string | null;
@@ -90,7 +113,9 @@ export interface UserRow {
   username: string;
   display_name: string;
   password_hash: string;
-  role: 'system' | 'tenant';
+  role: 'system' | 'tenant' | 'agent';
+  wa_number: string | null;
+  active: number;
   created_at: string;
 }
 
@@ -155,14 +180,14 @@ export function saveMessage(
   conversationId: number,
   role: MessageRow['role'],
   body: string,
-  extra: { mediaType?: string | null; waMessageId?: string | null } = {},
+  extra: { mediaType?: string | null; waMessageId?: string | null; userId?: number | null } = {},
 ): number {
   const info = db
     .prepare(
-      `INSERT INTO messages (conversation_id, role, body, media_type, wa_message_id)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO messages (conversation_id, role, body, media_type, wa_message_id, user_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
     )
-    .run(conversationId, role, body, extra.mediaType ?? null, extra.waMessageId ?? null);
+    .run(conversationId, role, body, extra.mediaType ?? null, extra.waMessageId ?? null, extra.userId ?? null);
   db.prepare(`UPDATE conversations SET last_message_at = ${SQL_NOW} WHERE id = ?`).run(conversationId);
   return Number(info.lastInsertRowid);
 }
@@ -211,4 +236,28 @@ export function createAlert(
     .prepare('INSERT INTO alerts (tenant_id, conversation_id, kind, title, body) VALUES (?, ?, ?, ?, ?)')
     .run(tenantId, conversationId ?? null, kind, title, body);
   return Number(info.lastInsertRowid);
+}
+
+/* ---------------------------------------------------------------
+   الإسناد والحضور
+--------------------------------------------------------------- */
+
+/** يُسند المحادثة لموظف، أو يرفع الإسناد بتمرير null. */
+export function assignConversation(db: Db, conversationId: number, userId: number | null): void {
+  db.prepare(
+    `UPDATE conversations SET assigned_to = ?, assigned_at = CASE WHEN ? IS NULL THEN NULL ELSE ${SQL_NOW} END
+     WHERE id = ?`,
+  ).run(userId, userId, conversationId);
+}
+
+/**
+ * يسجّل أن موظفاً يفتح هذه المحادثة الآن.
+ * حضور بسيط بلا websockets: يكفي أن يرى الثاني «منى فتحتها قبل ٢٠ ثانية»
+ * ليتوقف قبل أن يرد على نفس العميل مرتين.
+ */
+export function markViewing(db: Db, conversationId: number, userId: number): void {
+  db.prepare(`UPDATE conversations SET viewing_user_id = ?, viewing_at = ${SQL_NOW} WHERE id = ?`).run(
+    userId,
+    conversationId,
+  );
 }

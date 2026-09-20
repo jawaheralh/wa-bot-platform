@@ -31,7 +31,9 @@ export const CORE_TABLES: string[] = [
     username      TEXT    NOT NULL UNIQUE,
     display_name  TEXT    NOT NULL DEFAULT '',
     password_hash TEXT    NOT NULL,
-    role          TEXT    NOT NULL,                      -- system | tenant
+    role          TEXT    NOT NULL,                      -- system | tenant | agent
+    wa_number     TEXT,                                  -- جواله لتصله التنبيهات
+    active        INTEGER NOT NULL DEFAULT 1,            -- التعطيل بدل الحذف يحفظ نسبة الردود السابقة
     created_at    TEXT    NOT NULL DEFAULT (${SQL_NOW})
   )`,
 
@@ -54,6 +56,10 @@ export const CORE_TABLES: string[] = [
     bot_enabled     INTEGER NOT NULL DEFAULT 1,          -- إيقاف يدوي من صفحة الأدمن
     silent_until    TEXT,                                -- صمت مؤقت بعد تدخّل الموظف
     handoff_reason  TEXT,
+    assigned_to     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    assigned_at     TEXT,
+    viewing_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    viewing_at      TEXT,
     last_message_at TEXT,
     created_at      TEXT    NOT NULL DEFAULT (${SQL_NOW}),
     UNIQUE (tenant_id, customer_wa)
@@ -65,6 +71,7 @@ export const CORE_TABLES: string[] = [
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
     role            TEXT    NOT NULL,                    -- customer | bot | staff | system
+    user_id         INTEGER REFERENCES users(id) ON DELETE SET NULL,  -- أي موظف كتبها
     body            TEXT    NOT NULL DEFAULT '',
     media_type      TEXT,                                -- audio | image | document
     wa_message_id   TEXT,
@@ -90,4 +97,23 @@ export const CORE_TABLES: string[] = [
     created_at      TEXT    NOT NULL DEFAULT (${SQL_NOW})
   )`,
   `CREATE INDEX IF NOT EXISTS idx_alerts_tenant ON alerts(tenant_id, seen, id DESC)`,
+];
+
+
+/**
+ * أعمدة أُضيفت بعد الإطلاق.
+ *
+ * القاعدة التي أُنشئت قبل ميزة الفريق لا تملك هذه الأعمدة، و CREATE TABLE
+ * IF NOT EXISTS لن يضيفها. تُمرَّر على ensureColumn عند كل إقلاع.
+ * ملاحظة: SQLite لا يقبل REFERENCES في ALTER TABLE ADD COLUMN بقيمة
+ * افتراضية غير ثابتة، فنكتفي هنا بالنوع — القيد قائم في الجداول الجديدة.
+ */
+export const CORE_COLUMNS: [table: string, column: string, definition: string][] = [
+  ['users', 'wa_number', 'TEXT'],
+  ['users', 'active', 'INTEGER NOT NULL DEFAULT 1'],
+  ['conversations', 'assigned_to', 'INTEGER'],
+  ['conversations', 'assigned_at', 'TEXT'],
+  ['conversations', 'viewing_user_id', 'INTEGER'],
+  ['conversations', 'viewing_at', 'TEXT'],
+  ['messages', 'user_id', 'INTEGER'],
 ];

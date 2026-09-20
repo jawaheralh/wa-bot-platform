@@ -12,6 +12,7 @@ import { renderComplaints } from './views/complaints.js';
 import { renderKnowledge } from './views/knowledge.js';
 import { renderModules } from './views/modules.js';
 import { renderTenants } from './views/tenants.js';
+import { renderStaff } from './views/staff.js';
 
 const VIEWS = [
   { id: 'overview', label: 'نظرة عامة', render: renderOverview },
@@ -19,8 +20,12 @@ const VIEWS = [
   { id: 'complaints', label: 'الشكاوى', render: renderComplaints },
   { id: 'bookings', label: 'المواعيد', render: null, module: 'bookings' },
   { id: 'knowledge', label: 'قاعدة المعرفة', render: renderKnowledge },
+  { id: 'staff', label: 'الموظفون', render: renderStaff },
   { id: 'modules', label: 'الوحدات', render: renderModules },
 ];
+
+/** شاشات يراها مالك المنشأة وأدمن النظام دون الموظف. */
+const OWNER_ONLY = new Set(['knowledge', 'modules']);
 
 const root = document.getElementById('root');
 
@@ -50,6 +55,8 @@ function visibleViews() {
   return VIEWS.filter((view) => {
     if (view.module && !state.enabledModules.includes(view.module)) return false;
     if (!view.render && !view.module) return false;
+    // الموظف يرد على العملاء ولا يعدّل المعرفة ولا الوحدات.
+    if (state.me.role === 'agent' && OWNER_ONLY.has(view.id)) return false;
     return true;
   });
 }
@@ -62,9 +69,9 @@ function render() {
     <div class="layout">
       <aside class="sidebar">
         <h1>بوت واتساب</h1>
-        <div class="who">${esc(state.me.displayName)} · ${
-          state.me.role === 'system' ? 'أدمن النظام' : 'أدمن المنشأة'
-        }</div>
+        <div class="who">${esc(state.me.displayName)} · ${esc(
+          { system: 'أدمن النظام', tenant: 'مالك المنشأة', agent: 'موظف' }[state.me.role] ?? state.me.role,
+        )}</div>
 
         ${
           state.me.role === 'system'

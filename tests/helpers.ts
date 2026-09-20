@@ -58,6 +58,10 @@ export function fakeConversation(tenantId: number): ConversationRow {
     bot_enabled: 1,
     silent_until: null,
     handoff_reason: null,
+    assigned_to: null,
+    assigned_at: null,
+    viewing_user_id: null,
+    viewing_at: null,
     last_message_at: null,
     created_at: now(),
   };
