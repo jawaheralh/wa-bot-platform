@@ -198,6 +198,7 @@ export class BaileysProvider implements WhatsAppProvider {
         session.qr = undefined;
         session.detail = 'متصل';
         this.logger.info(`اتصل رقم المنشأة «${tenant.name}» بواتساب`, { tenant: tenant.id });
+        this.syncNumber(session, socket);
       }
 
       if (connection === 'close') {
@@ -230,6 +231,39 @@ export class BaileysProvider implements WhatsAppProvider {
         );
       }
     });
+  }
+
+  /**
+   * يلتقط الرقم الحقيقي من الجلسة بعد المسح ويحدّث سجل المنشأة.
+   *
+   * بدون هذا يبقى في القاعدة الرقم الذي كُتب يدوياً عند الإنشاء — وهو غالباً
+   * رقم مؤقت أو خاطئ. التوجيه يعمل رغم ذلك (الجلسة مربوطة برقم المنشأة لا
+   * بالرقم نفسه)، لكن اللوحة تعرض رقماً كاذباً والانتقال لـCloud API ينكسر.
+   */
+  private syncNumber(session: Session, socket: WASocket): void {
+    const raw = socket.user?.id;
+    if (!raw) return;
+
+    // معرّف Baileys قد يكون 9665…:12@s.whatsapp.net — نأخذ الأرقام قبل النقطتين.
+    const actual = normalizeNumber((raw.split(':')[0] ?? '').split('@')[0] ?? '');
+    if (!actual || actual === session.tenant.wa_number) return;
+
+    try {
+      this.db.prepare('UPDATE tenants SET wa_number = ? WHERE id = ?').run(actual, session.tenant.id);
+      this.logger.info(
+        `حُدّث رقم المنشأة «${session.tenant.name}» من ${session.tenant.wa_number} إلى ${actual} حسب الرقم الممسوح`,
+        { tenant: session.tenant.id },
+      );
+      session.tenant.wa_number = actual;
+    } catch (error) {
+      // رقم مستعمل لمنشأة أخرى: لا ندهسه، ننبّه ونُبقي التوجيه عاملاً بالقديم.
+      this.logger.error(
+        `الرقم ${actual} مسجَّل لمنشأة أخرى — صحّحي الأرقام من لوحة الأدمن`,
+        error,
+        { tenant: session.tenant.id },
+      );
+      session.detail = `تحذير: الرقم ${actual} مسجَّل لمنشأة أخرى`;
+    }
   }
 
   private async handleRaw(tenant: TenantRow, message: WAMessage): Promise<void> {
