@@ -12,6 +12,7 @@ import { createLogger, type Logger } from '../src/logger.ts';
 import { SimulatorProvider } from '../src/whatsapp/simulator.ts';
 import { now } from '../src/time.ts';
 import type { BotModule, ModuleContext } from '../src/modules/types.ts';
+import type { ChatRequest, ClaudeClient, ModelReply } from '../src/bot/claude.ts';
 
 export function freshDb(): Db {
   const db = openDb(':memory:');
@@ -94,5 +95,51 @@ export function makeFakeModule(name: string, options: Partial<BotModule> = {}): 
     ],
     runTool: async () => ({ content: `نُفِّذت ${name}` }),
     ...options,
+  };
+}
+
+/* ---------------------------------------------------------------
+   Claude وهمي
+--------------------------------------------------------------- */
+
+
+export interface ScriptedTurn {
+  /** نص يردّه النموذج. */
+  text?: string;
+  /** أدوات يطلب تنفيذها في هذه الجولة. */
+  toolCalls?: { name: string; input: Record<string, unknown> }[];
+}
+
+export interface MockClaude extends ClaudeClient {
+  /** كل طلب وصل للنموذج — نفحص منه الـsystem والأدوات. */
+  readonly requests: ChatRequest[];
+}
+
+/** نموذج مبرمَج: يردّ الجولات بالترتيب، وآخر جولة تتكرر إن نفدت. */
+export function mockClaude(turns: ScriptedTurn[]): MockClaude {
+  const requests: ChatRequest[] = [];
+  let index = 0;
+
+  return {
+    requests,
+    async chat(request: ChatRequest): Promise<ModelReply> {
+      requests.push(request);
+      const turn = turns[Math.min(index, turns.length - 1)] ?? { text: '' };
+      index += 1;
+      const toolCalls = (turn.toolCalls ?? []).map((call, i) => ({
+        id: `tool-${index}-${i}`,
+        name: call.name,
+        input: call.input,
+      }));
+      return {
+        text: turn.text ?? '',
+        toolCalls,
+        stopReason: toolCalls.length ? 'tool_use' : 'end_turn',
+        raw: [
+          ...(turn.text ? [{ type: 'text' as const, text: turn.text }] : []),
+          ...toolCalls.map((c) => ({ type: 'tool_use' as const, id: c.id, name: c.name, input: c.input })),
+        ],
+      };
+    },
   };
 }

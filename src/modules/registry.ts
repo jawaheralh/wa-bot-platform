@@ -10,6 +10,10 @@ import type { Db, TenantRow } from '../db/index.ts';
 import type { BotModule, ModuleConfig, ModuleContext, ToolDefinition, ToolResult } from './types.ts';
 import { SQL_NOW } from '../time.ts';
 
+import { inquiriesModule } from './inquiries.ts';
+import { complaintsModule } from './complaints.ts';
+import { handoffModule } from './handoff.ts';
+
 /* ===============================================================
    الوحدات المسجّلة
 
@@ -17,7 +21,7 @@ import { SQL_NOW } from '../time.ts';
    هذه القائمة. لا شيء آخر في المشروع يُعدَّل — الجداول والتفعيل وتجميع
    الأدوات والـprompt وتوجيه النداءات كلها تعمل تلقائياً بعدها.
    =============================================================== */
-export const MODULES: BotModule[] = [];
+export const MODULES: BotModule[] = [inquiriesModule, complaintsModule, handoffModule];
 
 /**
  * البحث خطّي عن قصد: الوحدات عشرات لا آلاف، وخريطة تُبنى مرة عند الاستيراد

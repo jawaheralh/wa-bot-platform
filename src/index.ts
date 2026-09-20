@@ -10,6 +10,9 @@ import { buildApp } from './app.ts';
 import { listTenants } from './db/index.ts';
 import { MODULES } from './modules/registry.ts';
 import { errorMessage } from './logger.ts';
+import { createClaudeClient } from './bot/claude.ts';
+import { createEngine } from './bot/engine.ts';
+import { createTranscriber } from './stt/index.ts';
 
 async function main(): Promise<void> {
   const app = await buildApp();
@@ -27,9 +30,17 @@ async function main(): Promise<void> {
     logger.warn('لا توجد منشآت بعد — شغّلي «npm run seed» لإنشاء منشأة تجريبية.');
   }
 
+  const claude = createClaudeClient(config.anthropicApiKey, config.anthropicModel, logger);
+  const transcriber = createTranscriber(config, logger);
+  const engine = createEngine({ app, claude, transcriber });
+
   provider.onMessage(async (message) => {
-    // محرّك البوت يُركَّب في المرحلة الثانية؛ حالياً نُثبت وصول الرسائل فقط.
-    logger.info('رسالة واردة', { إلى: message.toNumber, من: message.from, نص: message.text ?? '(صوت)' });
+    try {
+      await engine(message);
+    } catch (error) {
+      // خط الدفاع الأخير: خطأ غير متوقع في رسالة واحدة لا يُسقط العملية كلها.
+      logger.error('خطأ غير متوقع في معالجة رسالة', error, { من: message.from });
+    }
   });
 
   await provider.start();
