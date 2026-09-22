@@ -5,12 +5,21 @@ import { state } from '../core.js';
 
 export async function renderOverview(main) {
   const data = await get(`/api/tenants/${state.tenantId}`);
-  const { tenant, stats, connection, modules } = data;
+  const { tenant, stats, connection, modules, readOnly } = data;
 
   const enabled = modules.filter((m) => m.enabled);
   const disabled = modules.filter((m) => !m.enabled);
 
   main.innerHTML = `
+    ${
+      readOnly
+        ? `<div class="error" style="background:#fdf3e2;color:#b7791f;border:1px solid #f0d9a8">
+             👁 <strong>وضع «عرض فقط»</strong> — تُستقبل رسائل العملاء وتُحفظ وتظهر هنا،
+             ولا يُرسل النظام أي رد أو تنبيه إطلاقاً. لتفعيل الرد أزيلي
+             <span class="mono">READ_ONLY</span> من ملف <span class="mono">.env</span>.
+           </div>`
+        : ''
+    }
     <h2>${esc(tenant.name)}</h2>
     <p class="subtitle">
       الرقم <span class="num">${esc(tenant.wa_number)}</span> ·

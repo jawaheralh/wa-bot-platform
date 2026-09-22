@@ -11,6 +11,14 @@ import type { WhatsAppProvider } from './provider.ts';
 import { SimulatorProvider } from './simulator.ts';
 
 export async function createProvider(config: AppConfig, db: Db, logger: Logger): Promise<WhatsAppProvider> {
+  const provider = await createBaseProvider(config, db, logger);
+  if (!config.readOnly) return provider;
+
+  const { ReadOnlyProvider } = await import('./read-only.ts');
+  return new ReadOnlyProvider(provider, logger);
+}
+
+async function createBaseProvider(config: AppConfig, db: Db, logger: Logger): Promise<WhatsAppProvider> {
   switch (config.provider) {
     case 'baileys': {
       // استيراد كسول: Baileys ثقيل ولا داعي لتحميله في المحاكي أو الاختبارات.

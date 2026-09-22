@@ -99,8 +99,35 @@ export class BaileysProvider implements WhatsAppProvider {
   async start(): Promise<void> {
     for (const tenant of listTenants(this.db)) {
       if (tenant.status !== 'active') continue;
+      if (this.refuseCloudNumber(tenant)) continue;
       await this.connect(tenant);
     }
+  }
+
+  /**
+   * رفض فتح جلسة Baileys لرقم مسجَّل في Meta Cloud API.
+   *
+   * Baileys عميل غير رسمي مبني على هندسة عكسية لواتساب ويب، وواتساب يوقف
+   * الأرقام بسببه. رقم مسجَّل رسمياً في Meta — كرقم موحّد 9200 — لا يجوز
+   * مسحه بـQR إطلاقاً: هذا هو الفعل الوحيد في النظام كله الذي قد يُفقدك
+   * الرقم. لذلك نمنعه في الكود ولا نكتفي بتحذير في التوثيق.
+   */
+  private refuseCloudNumber(tenant: TenantRow): boolean {
+    if (!tenant.wa_phone_number_id) return false;
+    this.logger.error(
+      `رُفض فتح جلسة QR للمنشأة «${tenant.name}» (${tenant.wa_number}): الرقم مسجَّل في Meta Cloud API. ` +
+        'مسحه بـBaileys قد يعرّض الرقم للإيقاف — استعملي WA_PROVIDER=cloud لهذه المنشأة.',
+      undefined,
+      { tenant: tenant.id },
+    );
+    this.sessions.set(tenant.id, {
+      tenant,
+      socket: null,
+      connected: false,
+      detail: 'مرفوض: رقم Cloud API لا يُمسح بـQR',
+      stopping: true,
+    });
+    return true;
   }
 
   async stop(): Promise<void> {
@@ -119,6 +146,7 @@ export class BaileysProvider implements WhatsAppProvider {
     const tenant = listTenants(this.db).find((t) => t.id === tenantId);
     if (!tenant || tenant.status !== 'active') return;
     if (this.sessions.has(tenantId)) return;
+    if (this.refuseCloudNumber(tenant)) return;
     await this.connect(tenant);
   }
 

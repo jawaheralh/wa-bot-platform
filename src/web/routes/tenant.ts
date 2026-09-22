@@ -59,6 +59,7 @@ export function registerTenantRoutes(
     return {
       tenant,
       connection: provider.status(id),
+      readOnly: config.readOnly,
       supportWhatsApp: config.supportWhatsApp,
       modules: statusFor(db, id),
       stats: db
@@ -191,6 +192,14 @@ export function registerTenantRoutes(
 
     const text = String((request.body as { text?: string })?.text ?? '').trim();
     if (!text) throw Object.assign(new Error('نص الرسالة مطلوب.'), { statusCode: 400 });
+
+    // الغلاف يحجب الإرسال على أي حال، لكن السكوت هنا يوهم الموظف أن رده وصل.
+    if (config.readOnly) {
+      throw Object.assign(
+        new Error('وضع «عرض فقط» مُفعَّل — لا يُرسل النظام أي رسالة. أزيلي READ_ONLY من .env للرد.'),
+        { statusCode: 409 },
+      );
+    }
 
     const sent = await provider.sendText(id, conversation.customer_wa, text);
     saveMessage(db, conversationId, 'staff', text, { waMessageId: sent.id, userId: request.user?.id ?? null });

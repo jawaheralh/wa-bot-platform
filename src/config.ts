@@ -56,6 +56,11 @@ export interface AppConfig {
   transcription: { enabled: boolean; apiKey: string; model: string; baseUrl: string };
   baileys: { authDir: string };
   cloud: { verifyToken: string; appSecret: string; accessToken: string; graphVersion: string };
+  /**
+   * وضع المراقبة: يستقبل الرسائل ويعرضها ولا يُرسل شيئاً إطلاقاً.
+   * للفترة التي تريدين فيها رؤية ما يصل الرقم قبل أن يتكلم النظام باسمك.
+   */
+  readOnly: boolean;
   /** نافذة الصمت بعد تدخّل الموظف يدوياً (بالدقائق). */
   silentMinutes: number;
   /** عدد الرسائل المحفوظة كسياق للنموذج. */
@@ -136,6 +141,7 @@ export function loadConfig(): AppConfig {
       accessToken: str('WA_ACCESS_TOKEN'),
       graphVersion: str('WA_GRAPH_VERSION', 'v23.0'),
     },
+    readOnly: str('READ_ONLY', '0') === '1',
     silentMinutes: num('SILENT_MINUTES', 120),
     historyLimit: num('HISTORY_LIMIT', 20),
   };
