@@ -14,7 +14,9 @@
     "seed": "node src/seed.ts",
     "sim": "node src/sim.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "setup": "node src/setup.ts",
+    "check": "node src/setup.ts --check"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",
