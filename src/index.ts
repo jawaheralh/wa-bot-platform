@@ -8,6 +8,7 @@
 
 import { buildApp } from './app.ts';
 import { listTenants } from './db/index.ts';
+import { verifyPassword } from './tenants.ts';
 import { MODULES } from './modules/registry.ts';
 import { errorMessage, type Logger } from './logger.ts';
 import { createClaudeClient, type ClaudeClient } from './bot/claude.ts';
@@ -26,6 +27,29 @@ function disabledClaude(logger: Logger): ClaudeClient {
   };
 }
 
+/**
+ * كلمات مرور البذرة منشورة في README.
+ * بقاؤها على خادم عام يعني أن أي قارئ للمستودع يدخل لوحة التحكم، فنصرخ
+ * بها في السجل عند كل إقلاع حتى تُغيَّر.
+ */
+function warnAboutSeedPasswords(app: Awaited<ReturnType<typeof buildApp>>): void {
+  if (!app.config.publicUrl) return;
+
+  const seeded = (app.db.prepare('SELECT username, password_hash FROM users').all() as
+    | { username: string; password_hash: string }[]);
+  const weak = seeded.filter((user) =>
+    ['admin12345', 'noor12345', 'rukn12345'].some((password) => verifyPassword(password, user.password_hash)),
+  );
+
+  if (weak.length) {
+    app.logger.error(
+      `خطر: ${weak.length} حساب ما زال بكلمة مرور البذرة المنشورة في README (${weak
+        .map((u) => u.username)
+        .join('، ')}). غيّريها فوراً من شاشة الموظفين.`,
+    );
+  }
+}
+
 async function main(): Promise<void> {
   const app = await buildApp();
   const { config, db, logger, provider } = app;
@@ -41,6 +65,8 @@ async function main(): Promise<void> {
   if (tenants.length === 0) {
     logger.warn('لا توجد منشآت بعد — شغّلي «npm run seed» لإنشاء منشأة تجريبية.');
   }
+
+  warnAboutSeedPasswords(app);
 
   // بلا مفتاح لا يستطيع البوت الرد، لكن لوحة التحكم يجب أن تعمل: الأدمن
   // يحتاجها لإدخال المعرفة وإضافة المنشآت قبل أن يصل أول عميل.

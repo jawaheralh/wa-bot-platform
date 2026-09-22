@@ -1,0 +1,26 @@
+# Caddy — وكيل عكسي يحصل على شهادة HTTPS مجانية ويجددها تلقائياً.
+# هذا ما يجعل عنوانك صالحاً لـwebhook من Meta.
+#
+# التثبيت:
+#   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+#   sudo sed -i "s/DOMAIN_HERE/نطاقك.com/" /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+
+DOMAIN_HERE {
+	# النظام يستمع على 127.0.0.1 فقط، ولا يُعرَّض للإنترنت إلا عبر Caddy.
+	reverse_proxy 127.0.0.1:4000
+
+	encode gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy same-origin
+	}
+
+	log {
+		output file /var/log/caddy/wa-bot.log
+		format json
+	}
+}

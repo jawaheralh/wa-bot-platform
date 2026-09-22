@@ -42,6 +42,8 @@ export type ProviderName = 'baileys' | 'cloud' | 'simulator';
 export interface AppConfig {
   port: number;
   host: string;
+  /** العنوان العام في الإنتاج. وجوده يعني «هذا خادم على الإنترنت» ويشدّد الفحص. */
+  publicUrl: string;
   dbPath: string;
   sessionSecret: string;
   logLevel: LogLevel;
@@ -83,11 +85,29 @@ export function loadConfig(): AppConfig {
   const provider = requireIn('WA_PROVIDER', ['baileys', 'cloud', 'simulator'], 'simulator') as ProviderName;
   const logLevel = requireIn('LOG_LEVEL', ['debug', 'info', 'warn', 'error'], 'info') as LogLevel;
 
+  const isPublic = str('PUBLIC_URL') !== '';
   let sessionSecret = str('SESSION_SECRET');
+
   if (!sessionSecret) {
+    if (isPublic) {
+      throw new Error(
+        'SESSION_SECRET مطلوب في الإنتاج. ولّديه بـ:  openssl rand -hex 32',
+      );
+    }
     // سرّ عشوائي يكفي للتطوير، لكنه يُبطل الجلسات عند كل إعادة تشغيل.
     sessionSecret = randomBytes(32).toString('hex');
     console.warn('تحذير: SESSION_SECRET غير معرّف، وُلّد سرّ مؤقت — الجلسات تنتهي عند إعادة التشغيل.');
+  }
+
+  /**
+   * سرّ التطوير المكتوب في .env.example يسري بلا انتباه إلى الخادم.
+   * من عرفه زوّر كوكي جلسة لأي مستخدم، فنرفض الإقلاع بدل أن نحذّر —
+   * لوحة على الإنترنت بسرّ منشور في مستودع ليست خطأ يُحتمل.
+   */
+  if (isPublic && (sessionSecret.includes('change-me') || sessionSecret.length < 32)) {
+    throw new Error(
+      'SESSION_SECRET ضعيف أو هو قيمة المثال. ولّدي سرّاً حقيقياً:  openssl rand -hex 32',
+    );
   }
 
   const transcriptionKey = str('OPENAI_API_KEY');
@@ -95,6 +115,7 @@ export function loadConfig(): AppConfig {
   const config: AppConfig = {
     port: num('PORT', 4000),
     host: str('HOST', '127.0.0.1'),
+    publicUrl: str('PUBLIC_URL').replace(/\/$/, ''),
     dbPath: str('DB_PATH', join(ROOT, 'data', 'app.db')),
     sessionSecret,
     logLevel,
