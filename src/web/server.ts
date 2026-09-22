@@ -12,7 +12,16 @@ import fastifyStatic from '@fastify/static';
 import { join } from 'node:path';
 import type { App } from '../app.ts';
 import { ROOT } from '../config.ts';
-import { clearSession, login, readSession, registerAuthGuard, setSession } from './auth.ts';
+import {
+  clearSession,
+  login,
+  readSession,
+  registerAuthGuard,
+  setSession,
+  checkLoginRate,
+  recordLoginFailure,
+  clearLoginFailures,
+} from './auth.ts';
 import { registerSystemRoutes } from './routes/system.ts';
 import { registerTenantRoutes } from './routes/tenant.ts';
 import { MODULES } from '../modules/registry.ts';
@@ -48,7 +57,20 @@ export async function createServer(app: App): Promise<FastifyInstance> {
   /* --- الجلسة --- */
   server.post('/api/login', async (request, reply) => {
     const body = (request.body ?? {}) as { username?: string; password?: string };
-    const user = login(db, body.username ?? '', body.password ?? '');
+    // الحدّ على عنوان المصدر لا على اسم المستخدم، وإلا عطّل المهاجم حساب غيره.
+    const key = request.ip;
+    checkLoginRate(key);
+
+    let user;
+    try {
+      user = login(db, body.username ?? '', body.password ?? '');
+    } catch (error) {
+      recordLoginFailure(key);
+      logger.warn('محاولة دخول فاشلة', { مصدر: key, مستخدم: body.username ?? '' });
+      throw error;
+    }
+
+    clearLoginFailures(key);
     setSession(reply, user, request.protocol === 'https');
     logger.info('تسجيل دخول', { مستخدم: user.username, دور: user.role });
     return { username: user.username, displayName: user.display_name, role: user.role, tenantId: user.tenant_id };

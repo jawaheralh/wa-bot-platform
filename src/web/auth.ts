@@ -131,3 +131,42 @@ export function requireTenantAdmin(request: FastifyRequest, tenantId: number): n
   if (user.role === 'tenant' && user.tenantId === tenantId) return tenantId;
   throw Object.assign(new Error('هذه الصلاحية لمالك المنشأة فقط.'), { statusCode: 403 });
 }
+
+
+/* ---------------------------------------------------------------
+   تحديد معدّل محاولات الدخول
+--------------------------------------------------------------- */
+
+/**
+ * صفحة دخول مكشوفة على الإنترنت بلا حدّ للمحاولات تُخمَّن كلمتها بالقوة.
+ * عدّاد في الذاكرة يكفي: التشغيل عملية واحدة، وإعادة التشغيل تمسح العدّاد
+ * وهذا مقبول لأن المهاجم لا يتحكم بإعادة التشغيل.
+ */
+const attempts = new Map<string, { count: number; until: number }>();
+
+const MAX_ATTEMPTS = 8;
+const WINDOW_MS = 10 * 60_000;
+
+export function checkLoginRate(key: string): void {
+  const now = Date.now();
+  const entry = attempts.get(key);
+
+  if (entry && entry.until > now && entry.count >= MAX_ATTEMPTS) {
+    const minutes = Math.ceil((entry.until - now) / 60_000);
+    throw Object.assign(
+      new Error(`محاولات كثيرة. انتظري ${minutes} دقيقة ثم أعيدي المحاولة.`),
+      { statusCode: 429 },
+    );
+  }
+
+  if (!entry || entry.until <= now) attempts.set(key, { count: 0, until: now + WINDOW_MS });
+}
+
+export function recordLoginFailure(key: string): void {
+  const entry = attempts.get(key);
+  if (entry) entry.count += 1;
+}
+
+export function clearLoginFailures(key: string): void {
+  attempts.delete(key);
+}

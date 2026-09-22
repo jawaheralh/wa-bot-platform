@@ -233,3 +233,18 @@ describe('رموز حالة الدخول', () => {
     expect(missing.json().error).toBe(wrongPassword.json().error);
   });
 });
+
+describe('تحديد معدّل الدخول', () => {
+  it('المحاولات الفاشلة المتكررة تُحظر مؤقتاً بـ429', async () => {
+    let last = 0;
+    for (let i = 0; i < 12; i++) {
+      const response = await server.inject({
+        method: 'POST',
+        url: '/api/login',
+        payload: { username: 'owner', password: `غلط-${i}` },
+      });
+      last = response.statusCode;
+    }
+    expect(last).toBe(429);
+  });
+});
