@@ -138,6 +138,20 @@ interface Field {
 
 const FIELDS: Field[] = [
   {
+    key: 'WA_PROVIDER',
+    label: 'طريقة الربط بواتساب',
+    hint: 'baileys = مسح QR برقم ثانوي · cloud = الرسمي (يحتاج خادماً) · simulator = بلا اتصال',
+    validate: (v) =>
+      ['baileys', 'cloud', 'simulator'].includes(v) ? null : 'اكتبي: baileys أو cloud أو simulator.',
+  },
+  {
+    key: 'READ_ONLY',
+    label: 'وضع عرض فقط (0 أو 1)',
+    hint: '1 = يستقبل الرسائل ويعرضها ولا يُرسل شيئاً إطلاقاً.',
+    optional: true,
+    validate: (v) => (v === '0' || v === '1' ? null : 'اكتبي 0 أو 1.'),
+  },
+  {
     key: 'ANTHROPIC_API_KEY',
     label: 'مفتاح Claude',
     hint: 'من console.anthropic.com ← API Keys. بدونه لن يرد البوت.',

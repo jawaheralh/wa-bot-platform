@@ -82,6 +82,22 @@ export function registerTenantRoutes(
     };
   });
 
+  /**
+   * رمز QR مرسوماً SVG ليُمسح من المتصفح مباشرة.
+   * عرضه كنص خام في اللوحة لا يُمسح، وإجبار المستخدم على الطرفية لمجرد
+   * رؤية مربع أبيض وأسود عائق بلا سبب.
+   */
+  app.get('/api/tenants/:tenantId/qr', async (request, reply) => {
+    const id = tenantOf(request);
+    const status = provider.status(id);
+    if (!status.qr) {
+      return reply.code(404).send({ error: status.connected ? 'الرقم متصل بالفعل.' : 'لا يوجد رمز حالياً.' });
+    }
+    const { toString } = await import('qrcode');
+    const svg = await toString(status.qr, { type: 'svg', margin: 1, width: 320 });
+    return reply.type('image/svg+xml').header('cache-control', 'no-store').send(svg);
+  });
+
   /* --- المحادثات --- */
   app.get('/api/tenants/:tenantId/conversations', async (request) => {
     const id = tenantOf(request);

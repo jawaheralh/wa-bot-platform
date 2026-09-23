@@ -39,7 +39,19 @@ export async function renderOverview(main) {
       <p class="muted">المزوّد: <span class="num">${esc(connection.provider)}</span> —
         ${connection.connected ? '<span class="badge green">متصل</span>' : '<span class="badge amber">غير متصل</span>'}
         ${connection.detail ? ` · ${esc(connection.detail)}` : ''}</p>
-      ${connection.qr ? `<div id="qr" class="qr"></div>` : ''}
+      ${
+        connection.qr
+          ? `<div style="text-align:center;padding:12px">
+               <img src="/api/tenants/${state.tenantId}/qr?t=${Date.now()}" alt="رمز QR"
+                    style="width:280px;height:280px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px">
+               <p class="muted" style="margin:10px 0 0">
+                 واتساب على جوالك ← الإعدادات ← <strong>الأجهزة المرتبطة</strong> ← ربط جهاز ← وجّهي الكاميرا للرمز.
+                 <br>الرمز يتجدد كل ٢٠ ثانية — اضغطي «تحديث» إن انتهت صلاحيته.
+               </p>
+               <button class="btn ghost small" id="refreshQr" style="margin-top:8px">تحديث الرمز</button>
+             </div>`
+          : ''
+      }
     </div>
 
     <div class="card">
@@ -55,8 +67,11 @@ export async function renderOverview(main) {
   `;
 
   if (connection.qr) {
-    // نعرض الرمز كنص؛ المسح يتم من الطرفية حيث يُطبع مرسوماً.
-    document.getElementById('qr').textContent = connection.qr;
+    document.getElementById('refreshQr').onclick = () => renderOverview(main);
+    // الرمز ينتهي خلال ثوانٍ؛ التحديث التلقائي يجنّب المستخدم رمزاً ميتاً.
+    setTimeout(() => {
+      if (document.getElementById('refreshQr')) renderOverview(main);
+    }, 20000);
   }
 
   const alerts = await get(`/api/tenants/${state.tenantId}/alerts`);
