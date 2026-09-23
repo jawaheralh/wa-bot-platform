@@ -42,7 +42,7 @@ function ctx(overrides: Record<string, unknown> = {}): ModuleContext {
 
 beforeEach(() => {
   db = freshDb();
-  tenant = seedTenant(db, { name: 'وقودي' });
+  tenant = seedTenant(db, { name: 'منشأة الاختبار' });
   provider = new SimulatorProvider();
   setEnabled(db, tenant.id, 'requests', true);
 });
@@ -141,24 +141,24 @@ describe('إبلاغ العميل بتغيير الحالة', () => {
 
   it('الرسالة تحمل رقم الطلب والحالة بالعربي', () => {
     const row = { ...seedRequest(), status: 'in_progress' as const };
-    const text = customerUpdateText(row, 'وقودي');
+    const text = customerUpdateText(row, 'منشأة الاختبار');
     expect(text).toContain(row.reference);
     expect(text).toContain('قيد التنفيذ');
     expect(text).toContain('بدأنا العمل على طلبك');
-    expect(text).toContain('وقودي');
+    expect(text).toContain('منشأة الاختبار');
   });
 
   it('تغيير الحالة يرسل للعميل مرة واحدة', async () => {
     const row = seedRequest();
     const updated = setRequestStatus(db, tenant.id, row.id, 'in_progress');
 
-    const first = await notifyRequestCustomer(db, deps(), updated, 'وقودي');
+    const first = await notifyRequestCustomer(db, deps(), updated, 'منشأة الاختبار');
     expect(first.sent).toBe(true);
     expect(provider.outbox).toHaveLength(1);
     expect(provider.outbox[0]?.to).toBe('966555123456');
 
     // إعادة النداء لنفس الحالة لا تُزعج العميل مرة ثانية
-    const again = await notifyRequestCustomer(db, deps(), findRequest(db, tenant.id, row.reference)!, 'وقودي');
+    const again = await notifyRequestCustomer(db, deps(), findRequest(db, tenant.id, row.reference)!, 'منشأة الاختبار');
     expect(again.sent).toBe(false);
     expect(provider.outbox).toHaveLength(1);
   });
@@ -167,7 +167,7 @@ describe('إبلاغ العميل بتغيير الحالة', () => {
     const row = seedRequest();
     for (const status of ['in_progress', 'waiting_customer', 'done'] as const) {
       const updated = setRequestStatus(db, tenant.id, row.id, status);
-      await notifyRequestCustomer(db, deps(), updated, 'وقودي');
+      await notifyRequestCustomer(db, deps(), updated, 'منشأة الاختبار');
     }
     expect(provider.outbox).toHaveLength(3);
     expect(provider.outbox.map((m) => m.text.includes('منجز')).filter(Boolean)).toHaveLength(1);
@@ -180,7 +180,7 @@ describe('إبلاغ العميل بتغيير الحالة', () => {
     };
     const updated = setRequestStatus(db, tenant.id, row.id, 'in_progress');
 
-    const result = await notifyRequestCustomer(db, deps(), updated, 'وقودي');
+    const result = await notifyRequestCustomer(db, deps(), updated, 'منشأة الاختبار');
     expect(result.sent).toBe(false);
     expect(result.reason).toContain('٢٤ ساعة');
     // يبقى قابلاً لإعادة الإرسال لاحقاً
@@ -229,12 +229,12 @@ describe('الملاحظة تخصّ حالتها', () => {
     });
 
     const waiting = setRequestStatus(db, tenant.id, row.id, 'waiting_customer', 'نحتاج تأكيد موعد الفني');
-    expect(customerUpdateText(waiting, 'وقودي')).toContain('موعد الفني');
+    expect(customerUpdateText(waiting, 'منشأة الاختبار')).toContain('موعد الفني');
 
     const done = setRequestStatus(db, tenant.id, row.id, 'done');
     expect(done.note).toBeNull();
-    expect(customerUpdateText(done, 'وقودي')).not.toContain('موعد الفني');
-    expect(customerUpdateText(done, 'وقودي')).toContain('اكتمل طلبك');
+    expect(customerUpdateText(done, 'منشأة الاختبار')).not.toContain('موعد الفني');
+    expect(customerUpdateText(done, 'منشأة الاختبار')).toContain('اكتمل طلبك');
   });
 
   it('حفظ بنفس الحالة لا يمسح الملاحظة', () => {

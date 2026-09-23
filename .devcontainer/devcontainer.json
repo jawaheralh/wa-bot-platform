@@ -1,0 +1,36 @@
+{
+  "name": "منصة بوت واتساب",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:24-bookworm",
+
+  "features": {
+    "ghcr.io/devcontainers/features/sqlite:1": {}
+  },
+
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+
+  "forwardPorts": [4000],
+  "portsAttributes": {
+    "4000": {
+      "label": "لوحة التحكم",
+      "onAutoForward": "openPreview",
+      "visibility": "private"
+    }
+  },
+
+  "containerEnv": {
+    "HOST": "0.0.0.0",
+    "TZ": "Asia/Riyadh"
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "files.eol": "\n"
+      }
+    }
+  },
+
+  "remoteUser": "node"
+}

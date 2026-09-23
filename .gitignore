@@ -2,6 +2,7 @@ node_modules/
 data/
 backups/
 bin/
+.claude/
 .env
 .env.*
 !.env.example
