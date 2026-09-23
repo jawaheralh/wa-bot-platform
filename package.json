@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "setup": "node src/setup.ts",
-    "check": "node src/setup.ts --check"
+    "check": "node src/setup.ts --check",
+    "wa:check": "node src/wa-check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",
