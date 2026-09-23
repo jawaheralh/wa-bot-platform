@@ -47,11 +47,14 @@ export interface ComplaintRow {
   severity: Severity;
   status: Status;
   resolution: string | null;
+  notified_status: string | null;
   created_at: string;
   updated_at: string;
 }
 
 interface ComplaintsConfig extends ModuleConfig {
+  /** إبلاغ العميل على واتساب بكل تغيير في حالة شكواه. */
+  notifyCustomer: boolean;
   /** الخطورة التي تُصعَّد فوراً للموظف. */
   escalateFrom: Severity;
   /** نص إضافي يُضاف لرسالة تأكيد الشكوى (مثلاً: مدة الرد المتوقعة). */
@@ -59,6 +62,7 @@ interface ComplaintsConfig extends ModuleConfig {
 }
 
 const DEFAULTS: ComplaintsConfig = {
+  notifyCustomer: true,
   escalateFrom: 'high',
   acknowledgement: 'راح يتواصل معك المسؤول في أقرب وقت.',
 };
@@ -153,6 +157,7 @@ export const complaintsModule: BotModule = {
       severity        TEXT    NOT NULL DEFAULT 'medium',  -- low|medium|high
       status          TEXT    NOT NULL DEFAULT 'new',     -- new|in_progress|closed
       resolution      TEXT,
+      notified_status TEXT,
       created_at      TEXT    NOT NULL DEFAULT (${SQL_NOW}),
       updated_at      TEXT    NOT NULL DEFAULT (${SQL_NOW}),
       UNIQUE (tenant_id, reference)
@@ -165,6 +170,7 @@ export const complaintsModule: BotModule = {
   validateConfig(input) {
     const raw = (input ?? {}) as Partial<ComplaintsConfig>;
     return {
+      notifyCustomer: raw.notifyCustomer !== false,
       escalateFrom: SEVERITIES.includes(raw.escalateFrom as Severity)
         ? (raw.escalateFrom as Severity)
         : DEFAULTS.escalateFrom,
@@ -244,6 +250,7 @@ export const complaintsModule: BotModule = {
         severity,
       });
 
+      ctx.db.prepare(`UPDATE complaints SET notified_status = 'new' WHERE id = ?`).run(complaint.id);
       ctx.logger.info('سُجّلت شكوى', { مرجع: complaint.reference, تصنيف: category, خطورة: severity });
 
       /* --- التصعيد قرار برمجي لا يُترك للنموذج --- */
@@ -294,3 +301,26 @@ export const complaintsModule: BotModule = {
     return { content: `أداة غير معروفة: ${name}`, isError: true };
   },
 };
+
+
+/** نص التحديث الذي يصل العميل على واتساب عند تغيير حالة شكواه. */
+export function complaintUpdateText(row: ComplaintRow, tenantName: string): string {
+  const closing: Record<Status, string> = {
+    new: 'استلمنا شكواك وسجّلناها.',
+    in_progress: 'نعمل على معالجة شكواك الآن.',
+    closed: 'أُغلقت شكواك. نعتذر عن الإزعاج ونشكرك على إبلاغنا.',
+  };
+  return [
+    `تحديث على شكواك لدى ${tenantName}`,
+    '',
+    `الرقم المرجعي: ${row.reference}`,
+    `التصنيف: ${CATEGORY_AR[row.category]}`,
+    `الحالة: ${STATUS_AR[row.status]}`,
+    '',
+    closing[row.status],
+    row.resolution ? `ملاحظة المنشأة: ${row.resolution}` : '',
+  ]
+    .filter((line, i, all) => !(line === '' && all[i - 1] === ''))
+    .join('\n')
+    .trim();
+}

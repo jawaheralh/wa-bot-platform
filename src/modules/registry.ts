@@ -13,6 +13,7 @@ import { SQL_NOW } from '../time.ts';
 import { inquiriesModule } from './inquiries.ts';
 import { complaintsModule } from './complaints.ts';
 import { handoffModule } from './handoff.ts';
+import { requestsModule } from './requests.ts';
 import { bookingsModule } from './bookings.ts';
 
 /* ===============================================================
@@ -22,7 +23,7 @@ import { bookingsModule } from './bookings.ts';
    هذه القائمة. لا شيء آخر في المشروع يُعدَّل — الجداول والتفعيل وتجميع
    الأدوات والـprompt وتوجيه النداءات كلها تعمل تلقائياً بعدها.
    =============================================================== */
-export const MODULES: BotModule[] = [inquiriesModule, complaintsModule, handoffModule, bookingsModule];
+export const MODULES: BotModule[] = [inquiriesModule, complaintsModule, handoffModule, requestsModule, bookingsModule];
 
 /**
  * البحث خطّي عن قصد: الوحدات عشرات لا آلاف، وخريطة تُبنى مرة عند الاستيراد

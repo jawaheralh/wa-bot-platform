@@ -19,7 +19,15 @@ import {
 } from '../../db/index.ts';
 import { listStaff, addStaff, updateStaff, ROLE_AR } from '../../staff.ts';
 import { statusFor, setConfig, getModule } from '../../modules/registry.ts';
-import { listComplaints, updateComplaintStatus, STATUSES, type Status } from '../../modules/complaints.ts';
+import {
+  listComplaints,
+  updateComplaintStatus,
+  complaintUpdateText,
+  STATUSES,
+  type Status,
+} from '../../modules/complaints.ts';
+import { audit, listAudit, deleteCustomerData, exportCustomerData, ACTION_AR } from '../../compliance.ts';
+import { getConfig } from '../../modules/registry.ts';
 import { listKb, addKbEntry, updateKbEntry, deleteKbEntry } from '../../modules/inquiries.ts';
 import { listHandoffs, resolveHandoffs } from '../../modules/handoff.ts';
 import type { AppConfig } from '../../config.ts';
@@ -204,6 +212,14 @@ export function registerTenantRoutes(
     const sent = await provider.sendText(id, conversation.customer_wa, text);
     saveMessage(db, conversationId, 'staff', text, { waMessageId: sent.id, userId: request.user?.id ?? null });
     silenceConversation(db, conversationId, config.silentMinutes);
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username,
+      action: 'manual_reply',
+      target: conversation.customer_wa,
+      ip: request.ip,
+    });
 
     // من يرد يصبح مسؤولاً عنها ما لم تكن مُسندة لغيره صراحةً.
     if (!conversation.assigned_to && request.user) {
@@ -224,7 +240,41 @@ export function registerTenantRoutes(
     const complaintId = Number((request.params as Params & { complaintId: string }).complaintId);
     const body = (request.body ?? {}) as { status?: Status; resolution?: string };
     if (!body.status) throw Object.assign(new Error('الحالة مطلوبة.'), { statusCode: 400 });
-    return updateComplaintStatus(db, id, complaintId, body.status, body.resolution);
+
+    const before = db.prepare('SELECT status FROM complaints WHERE id = ? AND tenant_id = ?').get(complaintId, id) as
+      | { status: Status }
+      | undefined;
+    const complaint = updateComplaintStatus(db, id, complaintId, body.status, body.resolution);
+
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username,
+      action: 'status_change',
+      target: complaint.reference,
+      detail: `${before?.status ?? '؟'} ← ${complaint.status}`,
+      ip: request.ip,
+    });
+
+    /* --- إبلاغ العميل على واتساب بتغيير حالة شكواه --- */
+    let notice: { sent: boolean; reason?: string } = { sent: false, reason: 'الحالة لم تتغير.' };
+    const notifyEnabled = (getConfig(db, id, 'complaints') as { notifyCustomer?: boolean }).notifyCustomer !== false;
+
+    if (!notifyEnabled) {
+      notice = { sent: false, reason: 'إبلاغ العميل معطَّل لهذه المنشأة.' };
+    } else if (before?.status !== complaint.status && complaint.notified_status !== complaint.status) {
+      const tenant = getTenant(db, id)!;
+      try {
+        await provider.sendText(id, complaint.customer_wa, complaintUpdateText(complaint, tenant.name));
+        db.prepare('UPDATE complaints SET notified_status = ? WHERE id = ?').run(complaint.status, complaint.id);
+        notice = { sent: true };
+      } catch (error) {
+        // الفشل وارد على Cloud API خارج نافذة ٢٤ ساعة — لا نوهم الموظف أن العميل عَلِم.
+        notice = { sent: false, reason: (error as Error).message };
+      }
+    }
+
+    return { complaint, notice };
   });
 
   /* --- التحويلات --- */
@@ -316,6 +366,65 @@ export function registerTenantRoutes(
       active: typeof body.active === 'boolean' ? body.active : undefined,
       password: typeof body.password === 'string' && body.password ? body.password : undefined,
     });
+  });
+
+  /* --- سجل التدقيق وحقوق أصحاب البيانات (مالك المنشأة فقط) --- */
+  app.get('/api/tenants/:tenantId/audit', async (request) => {
+    const id = adminOf(request);
+    return { entries: listAudit(db, id), actions: ACTION_AR };
+  });
+
+  /** حق الاطلاع: كل ما لدينا عن عميل. */
+  app.get('/api/tenants/:tenantId/customers/:number/export', async (request) => {
+    const id = adminOf(request);
+    const number = (request.params as Params & { number: string }).number;
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username,
+      action: 'export_customer',
+      target: number,
+      ip: request.ip,
+    });
+    return exportCustomerData(db, id, number);
+  });
+
+  /** حق المحو: حذف فعلي لكل بيانات عميل في هذه المنشأة. */
+  app.delete('/api/tenants/:tenantId/customers/:number', async (request) => {
+    const id = adminOf(request);
+    const number = (request.params as Params & { number: string }).number;
+    const report = deleteCustomerData(db, id, number);
+    // يُسجَّل بعد الحذف: السجل نفسه لا يحتوي محتوى، والرقم ضروري لإثبات الاستجابة.
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username,
+      action: 'delete_customer',
+      target: report.customerWa,
+      detail: `محادثات ${report.conversations} · رسائل ${report.messages} · شكاوى ${report.complaints} · طلبات ${report.requests} · مواعيد ${report.bookings}`,
+      ip: request.ip,
+    });
+    return report;
+  });
+
+  /** مدة الاحتفاظ بالرسائل. */
+  app.put('/api/tenants/:tenantId/retention', async (request) => {
+    const id = adminOf(request);
+    const days = Number((request.body as { days?: number })?.days ?? 0);
+    if (!Number.isFinite(days) || days < 0 || days > 3650) {
+      throw Object.assign(new Error('المدة بين ٠ و٣٦٥٠ يوماً. صفر = بلا حذف.'), { statusCode: 400 });
+    }
+    db.prepare('UPDATE tenants SET retention_days = ? WHERE id = ?').run(Math.round(days), id);
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username,
+      action: 'module_config',
+      target: 'retention_days',
+      detail: String(Math.round(days)),
+      ip: request.ip,
+    });
+    return getTenant(db, id);
   });
 
   /* --- التنبيهات --- */

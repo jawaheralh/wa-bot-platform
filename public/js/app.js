@@ -13,19 +13,24 @@ import { renderKnowledge } from './views/knowledge.js';
 import { renderModules } from './views/modules.js';
 import { renderTenants } from './views/tenants.js';
 import { renderStaff } from './views/staff.js';
+import { renderRequests } from './views/requests.js';
+import { renderPrivacy } from './views/privacy.js';
+import { renderBookings } from './views/bookings.js';
 
 const VIEWS = [
   { id: 'overview', label: 'نظرة عامة', render: renderOverview },
   { id: 'conversations', label: 'المحادثات', render: renderConversations },
   { id: 'complaints', label: 'الشكاوى', render: renderComplaints },
-  { id: 'bookings', label: 'المواعيد', render: null, module: 'bookings' },
+  { id: 'requests', label: 'الطلبات', render: renderRequests, module: 'requests' },
+  { id: 'bookings', label: 'المواعيد', render: renderBookings, module: 'bookings' },
   { id: 'knowledge', label: 'قاعدة المعرفة', render: renderKnowledge },
   { id: 'staff', label: 'الموظفون', render: renderStaff },
+  { id: 'privacy', label: 'الخصوصية', render: renderPrivacy },
   { id: 'modules', label: 'الوحدات', render: renderModules },
 ];
 
 /** شاشات يراها مالك المنشأة وأدمن النظام دون الموظف. */
-const OWNER_ONLY = new Set(['knowledge', 'modules']);
+const OWNER_ONLY = new Set(['knowledge', 'modules', 'privacy']);
 
 const root = document.getElementById('root');
 
@@ -54,7 +59,7 @@ async function loadEnabledModules() {
 function visibleViews() {
   return VIEWS.filter((view) => {
     if (view.module && !state.enabledModules.includes(view.module)) return false;
-    if (!view.render && !view.module) return false;
+    if (!view.render) return false;
     // الموظف يرد على العملاء ولا يعدّل المعرفة ولا الوحدات.
     if (state.me.role === 'agent' && OWNER_ONLY.has(view.id)) return false;
     return true;
@@ -162,12 +167,6 @@ async function draw(main) {
       return;
     }
 
-    // شاشة تُقدَّمها وحدة لم تُبنَ واجهتها بعد.
-    const { renderBookings } = await import('./views/bookings.js').catch(() => ({ renderBookings: null }));
-    if (state.view === 'bookings' && renderBookings) {
-      await renderBookings(main);
-      return;
-    }
     main.innerHTML = '<div class="empty">هذه الشاشة غير متاحة.</div>';
   } catch (error) {
     main.innerHTML = `<div class="error">${esc(error.message)}</div>`;

@@ -19,6 +19,7 @@ export const CORE_TABLES: string[] = [
     tone               TEXT    NOT NULL DEFAULT 'friendly', -- formal | friendly
     staff_wa_number    TEXT,                             -- رقم الموظف الذي تصله التنبيهات
     status             TEXT    NOT NULL DEFAULT 'active',   -- active | suspended
+    retention_days     INTEGER NOT NULL DEFAULT 0,          -- 0 = احتفاظ بلا حد
     notes              TEXT,
     created_at         TEXT    NOT NULL DEFAULT (${SQL_NOW})
   )`,
@@ -79,6 +80,20 @@ export const CORE_TABLES: string[] = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, id DESC)`,
 
+  /* --- سجل التدقيق: من فعل ماذا ومتى --- */
+  `CREATE TABLE IF NOT EXISTS audit_log (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id  INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+    user_id    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    username   TEXT    NOT NULL DEFAULT '',   -- يُنسخ نصاً ليبقى بعد حذف الحساب
+    action     TEXT    NOT NULL,              -- login | status_change | delete_customer | ...
+    target     TEXT    NOT NULL DEFAULT '',
+    detail     TEXT    NOT NULL DEFAULT '',
+    ip         TEXT,
+    created_at TEXT    NOT NULL DEFAULT (${SQL_NOW})
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_audit_tenant ON audit_log(tenant_id, id DESC)`,
+
   /* --- عدّادات الأرقام المرجعية المقروءة: SHK-2026-000147 --- */
   `CREATE TABLE IF NOT EXISTS counters (
     scope TEXT PRIMARY KEY,
@@ -116,4 +131,6 @@ export const CORE_COLUMNS: [table: string, column: string, definition: string][]
   ['conversations', 'viewing_user_id', 'INTEGER'],
   ['conversations', 'viewing_at', 'TEXT'],
   ['messages', 'user_id', 'INTEGER'],
+  ['complaints', 'notified_status', 'TEXT'],
+  ['tenants', 'retention_days', 'INTEGER NOT NULL DEFAULT 0'],
 ];

@@ -26,6 +26,7 @@ import { registerSystemRoutes } from './routes/system.ts';
 import { registerTenantRoutes } from './routes/tenant.ts';
 import { MODULES } from '../modules/registry.ts';
 import { errorMessage } from '../logger.ts';
+import { audit } from '../compliance.ts';
 
 export async function createServer(app: App): Promise<FastifyInstance> {
   const { db, config, logger, provider, notify } = app;
@@ -67,12 +68,20 @@ export async function createServer(app: App): Promise<FastifyInstance> {
     } catch (error) {
       recordLoginFailure(key);
       logger.warn('محاولة دخول فاشلة', { مصدر: key, مستخدم: body.username ?? '' });
+      audit(db, { tenantId: null, action: 'login_failed', username: body.username ?? '', ip: key });
       throw error;
     }
 
     clearLoginFailures(key);
     setSession(reply, user, request.protocol === 'https');
     logger.info('تسجيل دخول', { مستخدم: user.username, دور: user.role });
+    audit(db, {
+      tenantId: user.tenant_id,
+      userId: user.id,
+      username: user.username,
+      action: 'login',
+      ip: key,
+    });
     return { username: user.username, displayName: user.display_name, role: user.role, tenantId: user.tenant_id };
   });
 

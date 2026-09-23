@@ -8,6 +8,8 @@
 import type { App } from './app.ts';
 import { listTenants } from './db/index.ts';
 import { tickTargets } from './modules/registry.ts';
+import { purgeOldMessages, audit } from './compliance.ts';
+import { today } from './time.ts';
 
 const TICK_MS = 60_000;
 
@@ -21,12 +23,41 @@ export function startScheduler(app: App): () => void {
   };
 
   let running = false;
+  let lastPurgeDay = '';
 
   const tick = async (): Promise<void> => {
     // نبضة بطيئة يجب ألّا تتراكم فوق نفسها.
     if (running) return;
     running = true;
     try {
+      // الحذف بانتهاء مدة الاحتفاظ مرة يومياً لا كل دقيقة.
+      const day = today();
+      if (day !== lastPurgeDay) {
+        lastPurgeDay = day;
+        for (const tenant of listTenants(app.db)) {
+          if (!tenant.retention_days) continue;
+          try {
+            const removed = purgeOldMessages(app.db, tenant.id, tenant.retention_days);
+            if (removed > 0) {
+              deps.logger.info('حُذفت رسائل بانتهاء مدة الاحتفاظ', {
+                tenant: tenant.id,
+                عدد: removed,
+                مدة: tenant.retention_days,
+              });
+              audit(app.db, {
+                tenantId: tenant.id,
+                username: 'النظام',
+                action: 'retention_purge',
+                target: `${tenant.retention_days} يوماً`,
+                detail: `حُذفت ${removed} رسالة`,
+              });
+            }
+          } catch (error) {
+            deps.logger.error('فشل الحذف بانتهاء مدة الاحتفاظ', error, { tenant: tenant.id });
+          }
+        }
+      }
+
       for (const target of tickTargets(app.db, listTenants(app.db))) {
         try {
           await target.module.onTick?.(target.tenant, target.config, deps);

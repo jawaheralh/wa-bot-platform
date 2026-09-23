@@ -76,6 +76,7 @@ export interface TenantRow {
   tone: 'formal' | 'friendly';
   staff_wa_number: string | null;
   status: 'active' | 'suspended';
+  retention_days: number;
   notes: string | null;
   created_at: string;
 }
