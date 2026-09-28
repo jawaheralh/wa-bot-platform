@@ -25,10 +25,14 @@ const HINTS = {
 export async function renderSetup(main) {
   main.innerHTML = '<h2>الإعداد</h2><div class="empty">جارٍ فحص الربط مع Meta…</div>';
 
-  const [settings, status] = await Promise.all([
+  const [settings, status, health] = await Promise.all([
     get('/api/system/settings'),
     get('/api/system/meta/status').catch((e) => ({ error: e.message, checks: [], numbers: [] })),
+    get('/api/system/health').catch(() => ({ checks: [], severity: 'warn', history: [] })),
   ]);
+
+  const BADGE = { ok: 'green', warn: 'amber', down: 'red' };
+  const LABEL = { ok: 'سليم', warn: 'تحذير', down: 'متعطّل' };
 
   const done = status.checks.filter((c) => c.ok).length;
   const total = status.checks.length;
@@ -36,6 +40,26 @@ export async function renderSetup(main) {
   main.innerHTML = `
     <h2>الإعداد</h2>
     <p class="subtitle">${done} من ${total} خطوات مكتملة · الجاري: <strong>${esc(settings.running.provider)}</strong></p>
+
+    <div class="card" style="${
+      health.severity === 'down' ? 'border:2px solid var(--danger)' : ''
+    }">
+      <h3>صحة النظام <span class="badge ${BADGE[health.severity]}">${esc(LABEL[health.severity] ?? '')}</span></h3>
+      <p class="muted">يُفحص تلقائياً كل ١٥ دقيقة، وينبّه الموظف على واتساب عند أي تغيّر.</p>
+      <div class="table-wrap"><table><tbody>${health.checks
+        .map(
+          (c) => `<tr>
+            <td style="width:40px"><span class="badge ${BADGE[c.severity]}">${
+              c.severity === 'ok' ? '✓' : c.severity === 'warn' ? '!' : '✗'
+            }</span></td>
+            <td style="width:180px"><strong>${esc(c.label)}</strong></td>
+            <td class="muted">${esc(c.message)}${
+              c.fix ? `<br><span style="color:var(--warn)">الحل: ${esc(c.fix)}</span>` : ''
+            }</td>
+          </tr>`,
+        )
+        .join('')}</tbody></table></div>
+    </div>
 
     <div class="card">
       <h3>قائمة الفحص</h3>

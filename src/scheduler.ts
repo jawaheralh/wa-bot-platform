@@ -9,6 +9,7 @@ import type { App } from './app.ts';
 import { listTenants } from './db/index.ts';
 import { tickTargets } from './modules/registry.ts';
 import { purgeOldMessages, audit } from './compliance.ts';
+import { runHealthCheck, alertIfChanged } from './health.ts';
 import { today } from './time.ts';
 
 const TICK_MS = 60_000;
@@ -24,6 +25,7 @@ export function startScheduler(app: App): () => void {
 
   let running = false;
   let lastPurgeDay = '';
+  let lastHealthCheck = 0;
 
   const tick = async (): Promise<void> => {
     // نبضة بطيئة يجب ألّا تتراكم فوق نفسها.
@@ -55,6 +57,17 @@ export function startScheduler(app: App): () => void {
           } catch (error) {
             deps.logger.error('فشل الحذف بانتهاء مدة الاحتفاظ', error, { tenant: tenant.id });
           }
+        }
+      }
+
+      /* --- فحص الصحة كل ١٥ دقيقة --- */
+      if (Date.now() - lastHealthCheck > 15 * 60_000) {
+        lastHealthCheck = Date.now();
+        try {
+          const checks = await runHealthCheck(app);
+          await alertIfChanged(app, checks);
+        } catch (error) {
+          deps.logger.error('فشل فحص الصحة', error);
         }
       }
 

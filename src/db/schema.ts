@@ -94,6 +94,15 @@ export const CORE_TABLES: string[] = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_audit_tenant ON audit_log(tenant_id, id DESC)`,
 
+  /* --- سجل فحص الصحة: آخر نتيجة لكل فحص --- */
+  `CREATE TABLE IF NOT EXISTS health_log (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    severity   TEXT    NOT NULL,              -- ok | warn | down
+    summary    TEXT    NOT NULL,
+    detail     TEXT    NOT NULL DEFAULT '',
+    created_at TEXT    NOT NULL DEFAULT (${SQL_NOW})
+  )`,
+
   /* --- عدّادات الأرقام المرجعية المقروءة: SHK-2026-000147 --- */
   `CREATE TABLE IF NOT EXISTS counters (
     scope TEXT PRIMARY KEY,

@@ -33,6 +33,8 @@ export async function createServer(app: App): Promise<FastifyInstance> {
   const { db, config, logger, provider, notify } = app;
 
   const server = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024 });
+  // فحص الصحة يحتاج التطبيق كاملاً (المزوّد والإعدادات)، لا القاعدة وحدها.
+  server.decorate('appRef', app);
 
   await server.register(cookie, { secret: config.sessionSecret });
   await server.register(formbody);

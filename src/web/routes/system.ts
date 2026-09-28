@@ -242,6 +242,16 @@ export function registerSystemRoutes(
     return meta.configureWebhook(config);
   });
 
+  /** فحص الصحة الآن — لا ينتظر النبضة. */
+  app.get('/api/system/health', async (request) => {
+    requireSystemAdmin(request);
+    const { runHealthCheck, worstOf } = await import('../../health.ts');
+    const app_ = (request.server as unknown as { appRef: Parameters<typeof runHealthCheck>[0] }).appRef;
+    const checks = await runHealthCheck(app_);
+    const history = db.prepare('SELECT * FROM health_log ORDER BY id DESC LIMIT 20').all();
+    return { checks, severity: worstOf(checks), history };
+  });
+
   /** مستخدم إضافي لمنشأة. */
   app.post('/api/system/tenants/:id/users', async (request, reply) => {
     requireSystemAdmin(request);
