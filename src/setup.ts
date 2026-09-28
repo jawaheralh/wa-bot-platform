@@ -109,6 +109,20 @@ async function testAnthropicKey(key: string): Promise<{ ok: boolean; message: st
   }
 }
 
+async function testMetaToken(token: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    const response = await fetch(`https://graph.facebook.com/v23.0/me?access_token=${encodeURIComponent(token)}`);
+    const data = (await response.json().catch(() => ({}))) as { name?: string; id?: string; error?: { message?: string } };
+    if (response.ok) return { ok: true, message: `التوكن يعمل ✓ (${data.name ?? data.id ?? ''})` };
+    if (response.status === 401 || data.error?.message?.includes('expired')) {
+      return { ok: false, message: 'التوكن منتهٍ أو مرفوض — تأكدي أنه التوكن الدائم لا المؤقت.' };
+    }
+    return { ok: false, message: `رفضت Meta: ${data.error?.message ?? response.status}` };
+  } catch (error) {
+    return { ok: false, message: `تعذّر الاتصال: ${(error as Error).message}` };
+  }
+}
+
 async function testOpenAiKey(key: string): Promise<{ ok: boolean; message: string }> {
   try {
     const response = await fetch('https://api.openai.com/v1/models', {
@@ -150,6 +164,22 @@ const FIELDS: Field[] = [
     hint: '1 = يستقبل الرسائل ويعرضها ولا يُرسل شيئاً إطلاقاً.',
     optional: true,
     validate: (v) => (v === '0' || v === '1' ? null : 'اكتبي 0 أو 1.'),
+  },
+  {
+    key: 'WA_ACCESS_TOKEN',
+    label: 'توكن Meta الدائم',
+    hint: 'Business settings ← مستخدمو النظام ← إنشاء رمز. يلزم فقط عند cloud.',
+    secret: true,
+    optional: true,
+    test: testMetaToken,
+  },
+  {
+    key: 'WA_APP_SECRET',
+    label: 'المفتاح السري للتطبيق',
+    hint: 'developers.facebook.com ← إعدادات التطبيق ← أساسي ← إظهار. يلزم فقط عند cloud.',
+    secret: true,
+    optional: true,
+    validate: (v) => (/^[a-f0-9]{32}$/i.test(v) ? null : 'المفتاح ٣٢ خانة ست عشرية. تأكدي من نسخه كاملاً بلا مسافات.'),
   },
   {
     key: 'ANTHROPIC_API_KEY',
@@ -277,6 +307,11 @@ async function main(): Promise<void> {
     }
 
     if (weak) updates.set('SESSION_SECRET', randomBytes(32).toString('hex'));
+
+    // رمز تحقق الـwebhook نص يختاره المالك، فنولّده بدل أن نسأل عنه.
+    if (!env.get('WA_VERIFY_TOKEN')) {
+      updates.set('WA_VERIFY_TOKEN', randomBytes(16).toString('hex'));
+    }
 
     if (updates.size === 0) {
       console.log(dim('\n  لم يتغير شيء.\n'));
