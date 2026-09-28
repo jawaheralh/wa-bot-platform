@@ -177,11 +177,26 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
         `الرقم: ${message.from}\nآخر رسالة: ${text}`,
         conversation.id,
       );
+
+      // الصمت خيار مقصود: حين يكون العطل عاماً، رسالة اعتذار لكل عميل
+      // أسوأ من لا شيء — تُتلف الانطباع وتضرّ تقييم الرقم. الموظف مُنبَّه.
+      if (config.silentOnFailure) {
+        convLogger.warn('صمت عند الفشل — أُبلغ الموظف ولم يُرسل للعميل شيء');
+        silenceConversation(db, conversation.id, config.silentMinutes);
+        return;
+      }
+
       reply = FALLBACK_REPLY;
       silenceAfter = Math.max(silenceAfter, config.silentMinutes);
     }
 
-    if (!reply.trim()) reply = FALLBACK_REPLY;
+    if (!reply.trim()) {
+      if (config.silentOnFailure) {
+        convLogger.warn('النموذج لم يُنتج رداً — صمت بدل اعتذار');
+        return;
+      }
+      reply = FALLBACK_REPLY;
+    }
 
     await send(tenant, conversation.id, message.from, reply, convLogger);
     if (silenceAfter > 0) silenceConversation(db, conversation.id, silenceAfter);

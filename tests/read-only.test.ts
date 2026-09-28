@@ -150,3 +150,74 @@ describe('حماية رقم Cloud API من Baileys', () => {
     await baileys.stop();
   });
 });
+
+describe('الصمت عند فشل البوت', () => {
+  it('بلا الخيار: يصل العميل اعتذار', async () => {
+    const provider2 = new SimulatorProvider();
+    const app = await buildApp({
+      config: { ...loadConfig(), provider: 'simulator', readOnly: false, silentOnFailure: false, anthropicApiKey: 'x' },
+      db,
+      provider: provider2,
+      logger: silentLogger(),
+    });
+    provider2.onMessage(
+      createEngine({
+        app,
+        claude: {
+          async chat() {
+            throw new Error('401 invalid x-api-key');
+          },
+        },
+      }),
+    );
+
+    await provider2.receive({ toNumber: tenant.wa_number, from: '966555555555', text: 'سلام' });
+    const toCustomer = provider2.outbox.filter((m) => m.to === '966555555555');
+    expect(toCustomer).toHaveLength(1);
+    expect(toCustomer[0]?.text).toContain('عطل تقني');
+  });
+
+  it('مع الخيار: لا يصل العميل شيء، ويُنبَّه الموظف', async () => {
+    const provider2 = new SimulatorProvider();
+    const app = await buildApp({
+      config: { ...loadConfig(), provider: 'simulator', readOnly: false, silentOnFailure: true, anthropicApiKey: 'x' },
+      db,
+      provider: provider2,
+      logger: silentLogger(),
+    });
+    provider2.onMessage(
+      createEngine({
+        app,
+        claude: {
+          async chat() {
+            throw new Error('401 invalid x-api-key');
+          },
+        },
+      }),
+    );
+
+    await provider2.receive({ toNumber: tenant.wa_number, from: '966555555555', text: 'سلام' });
+
+    // لا شيء للعميل
+    expect(provider2.outbox.filter((m) => m.to === '966555555555')).toHaveLength(0);
+    // لكن التنبيه محفوظ للموظف
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM alerts WHERE kind = 'handoff'`).get()).toEqual({ n: 1 });
+    // ورسالة العميل محفوظة فلا تضيع
+    const conv = getOrCreateConversation(db, tenant.id, '966555555555');
+    expect(recentMessages(db, conv.id, 5).some((m) => m.body === 'سلام')).toBe(true);
+  });
+
+  it('رد فارغ من النموذج: صمت أيضاً بدل اعتذار', async () => {
+    const provider2 = new SimulatorProvider();
+    const app = await buildApp({
+      config: { ...loadConfig(), provider: 'simulator', readOnly: false, silentOnFailure: true, anthropicApiKey: 'x' },
+      db,
+      provider: provider2,
+      logger: silentLogger(),
+    });
+    provider2.onMessage(createEngine({ app, claude: mockClaude([{ text: '   ' }]) }));
+
+    await provider2.receive({ toNumber: tenant.wa_number, from: '966555555555', text: 'سلام' });
+    expect(provider2.outbox.filter((m) => m.to === '966555555555')).toHaveLength(0);
+  });
+});

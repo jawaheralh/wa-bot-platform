@@ -77,6 +77,13 @@ export interface AppConfig {
    * للفترة التي تريدين فيها رؤية ما يصل الرقم قبل أن يتكلم النظام باسمك.
    */
   readOnly: boolean;
+  /**
+   * عند فشل توليد الرد: أيرسل اعتذاراً للعميل أم يصمت؟
+   * الصمت أنسب حين يكون العطل عاماً (مفتاح معطّل مثلاً): رسالة اعتذار
+   * لكل عميل تُتلف انطباعه وتضرّ تقييم الرقم لدى Meta، بينما الصمت
+   * يبدو كتأخّر عادي ويُعالجه الموظف المنبَّه.
+   */
+  silentOnFailure: boolean;
   /** نافذة الصمت بعد تدخّل الموظف يدوياً (بالدقائق). */
   silentMinutes: number;
   /** عدد الرسائل المحفوظة كسياق للنموذج. */
@@ -160,6 +167,7 @@ export function loadConfig(): AppConfig {
       businessId: str('WA_BUSINESS_ID'),
     },
     readOnly: str('READ_ONLY', '0') === '1',
+    silentOnFailure: str('SILENT_ON_FAILURE', '0') === '1',
     silentMinutes: num('SILENT_MINUTES', 120),
     historyLimit: num('HISTORY_LIMIT', 20),
   };

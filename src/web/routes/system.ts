@@ -114,6 +114,7 @@ export function registerSystemRoutes(
   const EDITABLE = [
     { key: 'WA_PROVIDER', label: 'طريقة الربط', secret: false },
     { key: 'READ_ONLY', label: 'وضع عرض فقط', secret: false },
+    { key: 'SILENT_ON_FAILURE', label: 'الصمت عند فشل البوت', secret: false },
     { key: 'WA_ACCESS_TOKEN', label: 'توكن Meta الدائم', secret: true },
     { key: 'WA_APP_SECRET', label: 'المفتاح السري للتطبيق', secret: true },
     { key: 'WA_APP_ID', label: 'معرّف التطبيق', secret: false },

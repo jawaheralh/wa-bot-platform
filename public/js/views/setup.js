@@ -10,6 +10,7 @@ import { get, put, post, esc, guard, flash } from '../core.js';
 const HINTS = {
   WA_PROVIDER: 'cloud = الرسمي · baileys = مسح QR برقم ثانوي · simulator = بلا اتصال',
   READ_ONLY: 'نعم = يستقبل ويعرض ولا يُرسل شيئاً إطلاقاً',
+  SILENT_ON_FAILURE: 'نعم = عند تعطّل البوت يصمت ويُنبّه الموظف، بدل إرسال اعتذار للعميل',
   WA_ACCESS_TOKEN: 'business.facebook.com ← مستخدمو النظام ← إنشاء رمز (دائم لا مؤقت)',
   WA_APP_SECRET: 'developers.facebook.com ← إعدادات التطبيق ← أساسي ← إظهار',
   WA_APP_ID: 'يظهر في نفس صفحة المفتاح السري، أو في رابط صفحة التطبيق',
@@ -89,10 +90,10 @@ export async function renderSetup(main) {
             ? `<select id="f-${f.key}" data-key="${f.key}">${['cloud', 'baileys', 'simulator']
                 .map((v) => `<option value="${v}"${v === f.value ? ' selected' : ''}>${v}</option>`)
                 .join('')}</select>`
-            : f.key === 'READ_ONLY'
+            : f.key === 'READ_ONLY' || f.key === 'SILENT_ON_FAILURE'
               ? `<select id="f-${f.key}" data-key="${f.key}">
-                   <option value="1"${f.value === '1' ? ' selected' : ''}>نعم — يستقبل ولا يُرسل</option>
-                   <option value="0"${f.value !== '1' ? ' selected' : ''}>لا — يعمل كاملاً</option>
+                   <option value="1"${f.value === '1' ? ' selected' : ''}>نعم</option>
+                   <option value="0"${f.value !== '1' ? ' selected' : ''}>لا</option>
                  </select>`
               : `<input id="f-${f.key}" data-key="${f.key}" data-secret="${f.secret}" dir="ltr"
                         value="${esc(f.value)}"
