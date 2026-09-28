@@ -145,12 +145,17 @@ export function registerSystemRoutes(
     const body = (request.body ?? {}) as Record<string, string>;
     const updates = new Map<string, string>();
 
+    const current = readEnvFile();
+
     for (const field of EDITABLE) {
       const value = body[field.key];
       if (value === undefined) continue;
       const trimmed = String(value).trim();
       // الحقل السري الذي أُعيد محجوباً ولم يُلمس لا يُدهس بقيمة النجوم.
       if (field.secret && (trimmed === '' || trimmed.includes('…') || trimmed.includes('•'))) continue;
+      // القيمة التي لم تتغيّر لا تُحسب: «حُفظت ٨ قيمة» بلا تغيير تُوهم
+      // بأن شيئاً جرى وتطلب إعادة تشغيل بلا داعٍ.
+      if ((current.get(field.key) ?? '') === trimmed) continue;
       updates.set(field.key, trimmed);
     }
 
@@ -166,7 +171,7 @@ export function registerSystemRoutes(
     }
 
     // رمز التحقق نص يختاره المالك؛ نولّده إن كان فارغاً ليكتمل إعداد الـwebhook.
-    if (!readEnvFile().get('WA_VERIFY_TOKEN') && !updates.get('WA_VERIFY_TOKEN')) {
+    if (!current.get('WA_VERIFY_TOKEN') && !updates.get('WA_VERIFY_TOKEN')) {
       updates.set('WA_VERIFY_TOKEN', randomBytes(16).toString('hex'));
     }
 

@@ -67,9 +67,18 @@ function visibleViews() {
   });
 }
 
+/**
+ * شاشات أدمن النظام: ليست في VIEWS لأنها لا تخص منشأة بعينها.
+ * إغفالها هنا جعل الحارس أدناه يُعيدها إلى «نظرة عامة» عند كل ضغطة.
+ */
+const SYSTEM_VIEWS = new Set(['setup', 'tenants']);
+
 function render() {
   const views = visibleViews();
-  if (!views.some((v) => v.id === state.view)) state.view = views[0]?.id ?? 'overview';
+  // شاشة غير متاحة (وحدة عُطّلت مثلاً) تُبدَّل بأول متاحة — عدا شاشات النظام.
+  if (!SYSTEM_VIEWS.has(state.view) && !views.some((v) => v.id === state.view)) {
+    state.view = views[0]?.id ?? 'overview';
+  }
 
   root.innerHTML = `
     <div class="layout">
