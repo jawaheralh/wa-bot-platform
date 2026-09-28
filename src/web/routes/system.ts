@@ -10,6 +10,8 @@ import { requireSystemAdmin } from '../auth.ts';
 import { createTenant, createUser } from '../../tenants.ts';
 import { listTenants, getTenant, normalizeNumber, type Db } from '../../db/index.ts';
 import { setEnabled, statusFor } from '../../modules/registry.ts';
+import { readEnvFile, writeEnvFile, maskSecret } from '../../env-file.ts';
+import { randomBytes } from 'node:crypto';
 import type { WhatsAppProvider } from '../../whatsapp/provider.ts';
 
 export function registerSystemRoutes(app: FastifyInstance, db: Db, provider: WhatsAppProvider): void {
@@ -96,6 +98,88 @@ export function registerSystemRoutes(app: FastifyInstance, db: Db, provider: Wha
     const body = (request.body ?? {}) as { enabled?: boolean };
     setEnabled(db, Number(id), module, body.enabled === true);
     return statusFor(db, Number(id));
+  });
+
+  /* ---------------------------------------------------------------
+     إعدادات التشغيل — لصق المفاتيح من اللوحة بدل تحرير .env يدوياً
+  --------------------------------------------------------------- */
+
+  /** الحقول التي تُحرَّر من اللوحة. الأسرار تُعاد محجوبة أبداً. */
+  const EDITABLE = [
+    { key: 'WA_PROVIDER', label: 'طريقة الربط', secret: false },
+    { key: 'READ_ONLY', label: 'وضع عرض فقط', secret: false },
+    { key: 'WA_ACCESS_TOKEN', label: 'توكن Meta الدائم', secret: true },
+    { key: 'WA_APP_SECRET', label: 'المفتاح السري للتطبيق', secret: true },
+    { key: 'WA_VERIFY_TOKEN', label: 'رمز تحقق webhook', secret: false },
+    { key: 'ANTHROPIC_API_KEY', label: 'مفتاح Claude', secret: true },
+    { key: 'OPENAI_API_KEY', label: 'مفتاح OpenAI (للرسائل الصوتية)', secret: true },
+    { key: 'SUPPORT_WHATSAPP', label: 'رقم الدعم', secret: false },
+    { key: 'PUBLIC_URL', label: 'العنوان العام (للـwebhook)', secret: false },
+  ] as const;
+
+  app.get('/api/system/settings', async (request) => {
+    requireSystemAdmin(request);
+    const env = readEnvFile();
+    return {
+      fields: EDITABLE.map((f) => ({
+        ...f,
+        value: f.secret ? maskSecret(env.get(f.key) ?? '') : (env.get(f.key) ?? ''),
+        isSet: Boolean(env.get(f.key)),
+      })),
+      // الجاري فعلياً في العملية — قد يخالف الملف حتى يُعاد التشغيل
+      running: { provider: provider.name, readOnly: String(process.env.READ_ONLY ?? '0') === '1' },
+    };
+  });
+
+  app.put('/api/system/settings', async (request) => {
+    requireSystemAdmin(request);
+    const body = (request.body ?? {}) as Record<string, string>;
+    const updates = new Map<string, string>();
+
+    for (const field of EDITABLE) {
+      const value = body[field.key];
+      if (value === undefined) continue;
+      const trimmed = String(value).trim();
+      // الحقل السري الذي أُعيد محجوباً ولم يُلمس لا يُدهس بقيمة النجوم.
+      if (field.secret && (trimmed === '' || trimmed.includes('…') || trimmed.includes('•'))) continue;
+      updates.set(field.key, trimmed);
+    }
+
+    if (updates.get('WA_PROVIDER') && !['baileys', 'cloud', 'simulator'].includes(updates.get('WA_PROVIDER')!)) {
+      throw Object.assign(new Error('طريقة الربط: baileys أو cloud أو simulator.'), { statusCode: 400 });
+    }
+    const secret = updates.get('WA_APP_SECRET');
+    if (secret && !/^[a-f0-9]{32}$/i.test(secret)) {
+      throw Object.assign(
+        new Error('المفتاح السري ٣٢ خانة ست عشرية. تأكدي من نسخه كاملاً بلا مسافات.'),
+        { statusCode: 400 },
+      );
+    }
+
+    // رمز التحقق نص يختاره المالك؛ نولّده إن كان فارغاً ليكتمل إعداد الـwebhook.
+    if (!readEnvFile().get('WA_VERIFY_TOKEN') && !updates.get('WA_VERIFY_TOKEN')) {
+      updates.set('WA_VERIFY_TOKEN', randomBytes(16).toString('hex'));
+    }
+
+    if (updates.size === 0) return { saved: 0, restartNeeded: false };
+    writeEnvFile(updates);
+    return { saved: updates.size, restartNeeded: true, keys: [...updates.keys()] };
+  });
+
+  /** يختبر توكن Meta الحالي مقابل Graph API. */
+  app.post('/api/system/settings/test-meta', async (request) => {
+    requireSystemAdmin(request);
+    const token = readEnvFile().get('WA_ACCESS_TOKEN');
+    if (!token) return { ok: false, message: 'التوكن غير مضبوط.' };
+
+    try {
+      const response = await fetch(`https://graph.facebook.com/v23.0/me?access_token=${encodeURIComponent(token)}`);
+      const data = (await response.json().catch(() => ({}))) as { name?: string; id?: string; error?: { message?: string } };
+      if (response.ok) return { ok: true, message: `التوكن يعمل — ${data.name ?? data.id ?? ''}` };
+      return { ok: false, message: data.error?.message ?? `رفضت Meta (${response.status})` };
+    } catch (error) {
+      return { ok: false, message: `تعذّر الاتصال: ${(error as Error).message}` };
+    }
   });
 
   /** مستخدم إضافي لمنشأة. */

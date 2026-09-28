@@ -12,6 +12,7 @@ import { renderComplaints } from './views/complaints.js';
 import { renderKnowledge } from './views/knowledge.js';
 import { renderModules } from './views/modules.js';
 import { renderTenants } from './views/tenants.js';
+import { renderSettings } from './views/settings.js';
 import { renderStaff } from './views/staff.js';
 import { renderRequests } from './views/requests.js';
 import { renderPrivacy } from './views/privacy.js';
@@ -95,7 +96,8 @@ function render() {
         <nav>
           ${
             state.me.role === 'system'
-              ? `<button data-view="tenants" class="${state.view === 'tenants' ? 'active' : ''}">كل المنشآت</button>`
+              ? `<button data-view="tenants" class="${state.view === 'tenants' ? 'active' : ''}">كل المنشآت</button>
+                 <button data-view="settings" class="${state.view === 'settings' ? 'active' : ''}">إعدادات التشغيل</button>`
               : ''
           }
           ${
@@ -146,6 +148,11 @@ function render() {
 
 async function draw(main) {
   try {
+    if (state.view === 'settings') {
+      await renderSettings(main);
+      return;
+    }
+
     if (state.view === 'tenants') {
       await renderTenants(main, async (tenantId) => {
         state.tenantId = tenantId;
