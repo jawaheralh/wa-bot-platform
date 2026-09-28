@@ -25,6 +25,7 @@ import {
 import { registerSystemRoutes } from './routes/system.ts';
 import { registerTenantRoutes } from './routes/tenant.ts';
 import { MODULES } from '../modules/registry.ts';
+import { unwrapProvider } from '../whatsapp/provider.ts';
 import { errorMessage } from '../logger.ts';
 import { audit } from '../compliance.ts';
 
@@ -46,10 +47,12 @@ export async function createServer(app: App): Promise<FastifyInstance> {
   });
 
   /* --- webhook مزوّد Cloud API: قبل حارس المصادقة، فالمتصل هو Meta --- */
-  if (provider.name === 'cloud') {
+  const base = unwrapProvider(provider);
+  if (base.name === 'cloud') {
     const { registerCloudWebhook, CloudApiProvider } = await import('../whatsapp/cloud-api.ts');
-    if (provider instanceof CloudApiProvider) {
-      registerCloudWebhook(server, provider, config, logger);
+    if (base instanceof CloudApiProvider) {
+      registerCloudWebhook(server, base, config, logger);
+      logger.info('سُجّل مسار webhook على /webhook/whatsapp');
     }
   }
 
@@ -98,7 +101,7 @@ export async function createServer(app: App): Promise<FastifyInstance> {
     return user;
   });
 
-  registerSystemRoutes(server, db, provider);
+  registerSystemRoutes(server, db, provider, config);
   registerTenantRoutes(server, db, config, provider);
 
   /* --- مسارات الوحدات: تُركَّب تلقائياً --- */

@@ -41,6 +41,11 @@ export class ReadOnlyProvider implements WhatsAppProvider {
     return `${this.inner.name} (عرض فقط)`;
   }
 
+  /** المزوّد المُغلَّف — يحتاجه من يفحص النوع الفعلي لا الاسم المزخرف. */
+  get wrapped(): WhatsAppProvider {
+    return this.inner;
+  }
+
   async start(): Promise<void> {
     this.logger.warn('وضع «عرض فقط» مُفعَّل — تُستقبل الرسائل وتُحفظ، ولا يُرسل شيء إطلاقاً.');
     await this.inner.start();

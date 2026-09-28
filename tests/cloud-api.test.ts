@@ -23,6 +23,8 @@ function cloudConfig(): AppConfig {
       appSecret: APP_SECRET,
       accessToken: 'test-token',
       graphVersion: 'v23.0',
+      appId: 'APP_TEST',
+      businessId: 'BIZ_TEST',
     },
   };
 }

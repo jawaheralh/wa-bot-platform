@@ -9,12 +9,18 @@ import type { FastifyInstance } from 'fastify';
 import { requireSystemAdmin } from '../auth.ts';
 import { createTenant, createUser } from '../../tenants.ts';
 import { listTenants, getTenant, normalizeNumber, type Db } from '../../db/index.ts';
+import type { AppConfig } from '../../config.ts';
 import { setEnabled, statusFor } from '../../modules/registry.ts';
 import { readEnvFile, writeEnvFile, maskSecret } from '../../env-file.ts';
 import { randomBytes } from 'node:crypto';
 import type { WhatsAppProvider } from '../../whatsapp/provider.ts';
 
-export function registerSystemRoutes(app: FastifyInstance, db: Db, provider: WhatsAppProvider): void {
+export function registerSystemRoutes(
+  app: FastifyInstance,
+  db: Db,
+  provider: WhatsAppProvider,
+  config: AppConfig,
+): void {
   /** كل المنشآت مع ملخص حالتها. */
   app.get('/api/system/tenants', async (request) => {
     requireSystemAdmin(request);
@@ -110,6 +116,8 @@ export function registerSystemRoutes(app: FastifyInstance, db: Db, provider: Wha
     { key: 'READ_ONLY', label: 'وضع عرض فقط', secret: false },
     { key: 'WA_ACCESS_TOKEN', label: 'توكن Meta الدائم', secret: true },
     { key: 'WA_APP_SECRET', label: 'المفتاح السري للتطبيق', secret: true },
+    { key: 'WA_APP_ID', label: 'معرّف التطبيق', secret: false },
+    { key: 'WA_BUSINESS_ID', label: 'معرّف النشاط التجاري', secret: false },
     { key: 'WA_VERIFY_TOKEN', label: 'رمز تحقق webhook', secret: false },
     { key: 'ANTHROPIC_API_KEY', label: 'مفتاح Claude', secret: true },
     { key: 'OPENAI_API_KEY', label: 'مفتاح OpenAI (للرسائل الصوتية)', secret: true },
@@ -180,6 +188,57 @@ export function registerSystemRoutes(app: FastifyInstance, db: Db, provider: Wha
     } catch (error) {
       return { ok: false, message: `تعذّر الاتصال: ${(error as Error).message}` };
     }
+  });
+
+  /* ---------------------------------------------------------------
+     حالة الربط مع Meta وضبطه برمجياً
+  --------------------------------------------------------------- */
+
+  /** قائمة فحص حيّة: كل بند يُسأل عنه مصدره الحقيقي لا الملف. */
+  app.get('/api/system/meta/status', async (request) => {
+    requireSystemAdmin(request);
+    const meta = await import('../../meta-setup.ts');
+    const env = readEnvFile();
+    const publicUrl = env.get('PUBLIC_URL') ?? '';
+
+    const tenants = listTenants(db).filter((t) => t.wa_phone_number_id && t.status === 'active');
+
+    const [token, secret, webhook] = await Promise.all([
+      meta.checkToken(config),
+      meta.checkAppSecret(config),
+      config.publicUrl ? meta.checkWebhook(config) : Promise.resolve({ ok: false, message: 'لا يوجد عنوان عام بعد.' }),
+    ]);
+
+    const numbers = await Promise.all(
+      tenants.map(async (t) => ({
+        tenant: t.name,
+        ...(await meta.checkPhoneNumber(config, t.wa_phone_number_id!)),
+      })),
+    );
+
+    return {
+      publicUrl,
+      verifyToken: env.get('WA_VERIFY_TOKEN') ?? '',
+      webhookUrl: publicUrl ? `${publicUrl}/webhook/whatsapp` : '',
+      running: { provider: provider.name },
+      checks: [
+        { key: 'provider', label: 'طريقة الربط', ok: env.get('WA_PROVIDER') === 'cloud',
+          message: env.get('WA_PROVIDER') === 'cloud' ? 'cloud ✓' : `الحالي: ${env.get('WA_PROVIDER') ?? 'غير مضبوط'} — يجب cloud` },
+        { key: 'token', label: 'توكن Meta', ...token },
+        { key: 'secret', label: 'المفتاح السري', ...secret },
+        { key: 'publicUrl', label: 'العنوان العام', ok: Boolean(publicUrl),
+          message: publicUrl || 'لا يوجد — Cloud API لا يستقبل بدونه.' },
+        { key: 'webhook', label: 'الـwebhook لدى Meta', ...webhook },
+      ],
+      numbers,
+    };
+  });
+
+  /** يضبط الـwebhook ويشترك حساب واتساب — بديل واجهة Meta. */
+  app.post('/api/system/meta/configure-webhook', async (request) => {
+    requireSystemAdmin(request);
+    const meta = await import('../../meta-setup.ts');
+    return meta.configureWebhook(config);
   });
 
   /** مستخدم إضافي لمنشأة. */

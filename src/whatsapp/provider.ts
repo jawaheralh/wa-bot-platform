@@ -101,3 +101,21 @@ export async function withRetry<T>(
   }
   throw lastError;
 }
+
+
+/**
+ * يُعيد المزوّد الأصلي من تحت أي أغلفة.
+ *
+ * وضع «عرض فقط» يلفّ المزوّد ويغيّر اسمه، فأي فحص على `provider.name`
+ * يسقط بصمت — وهذا ما عطّل تسجيل webhook الـCloud API. الفحص على النوع
+ * المُغلَّف لا على الاسم.
+ */
+export function unwrapProvider(provider: WhatsAppProvider): WhatsAppProvider {
+  let current = provider;
+  for (let depth = 0; depth < 5; depth++) {
+    const inner = (current as { wrapped?: WhatsAppProvider }).wrapped;
+    if (!inner) break;
+    current = inner;
+  }
+  return current;
+}

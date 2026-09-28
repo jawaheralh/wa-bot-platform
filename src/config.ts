@@ -17,8 +17,15 @@ import type { LogLevel } from './logger.ts';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** يقرأ .env إن وُجد بلا أن يدهس متغيرات البيئة المُمرَّرة من سطر الأوامر. */
+/**
+ * يقرأ .env إن وُجد بلا أن يدهس متغيرات البيئة المُمرَّرة من سطر الأوامر.
+ *
+ * يُتجاهل تماماً أثناء الاختبارات: قراءته تجعل نتيجة الاختبار تعتمد على
+ * إعدادات جهاز المطوّر — فتسقط اختبارات لمجرد أن أحدهم فعّل «عرض فقط»
+ * على جهازه. الاختبارات تُمرّر ما تحتاجه صراحةً.
+ */
 export function loadEnvFile(path = join(ROOT, '.env')): void {
+  if (process.env.VITEST) return;
   if (!existsSync(path)) return;
   for (const raw of readFileSync(path, 'utf8').split('\n')) {
     const line = raw.trim();
@@ -55,7 +62,16 @@ export interface AppConfig {
   /** تحويل الرسائل الصوتية لنص — يُعطَّل تلقائياً إذا لم يوجد مفتاح. */
   transcription: { enabled: boolean; apiKey: string; model: string; baseUrl: string };
   baileys: { authDir: string };
-  cloud: { verifyToken: string; appSecret: string; accessToken: string; graphVersion: string };
+  cloud: {
+    verifyToken: string;
+    appSecret: string;
+    accessToken: string;
+    graphVersion: string;
+    /** معرّف تطبيق Meta — يلزم لضبط الـwebhook برمجياً. */
+    appId: string;
+    /** معرّف النشاط التجاري — لإيجاد حسابات واتساب المملوكة. */
+    businessId: string;
+  };
   /**
    * وضع المراقبة: يستقبل الرسائل ويعرضها ولا يُرسل شيئاً إطلاقاً.
    * للفترة التي تريدين فيها رؤية ما يصل الرقم قبل أن يتكلم النظام باسمك.
@@ -140,6 +156,8 @@ export function loadConfig(): AppConfig {
       appSecret: str('WA_APP_SECRET'),
       accessToken: str('WA_ACCESS_TOKEN'),
       graphVersion: str('WA_GRAPH_VERSION', 'v23.0'),
+      appId: str('WA_APP_ID'),
+      businessId: str('WA_BUSINESS_ID'),
     },
     readOnly: str('READ_ONLY', '0') === '1',
     silentMinutes: num('SILENT_MINUTES', 120),
