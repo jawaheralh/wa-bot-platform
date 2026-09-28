@@ -134,7 +134,28 @@ function checkKnowledge(db: Db): HealthCheck[] {
 
 export async function runHealthCheck(app: App): Promise<HealthCheck[]> {
   const [claude, meta] = await Promise.all([checkClaude(app), checkMeta(app)]);
-  return [claude, ...meta, ...checkKnowledge(app.db)];
+  return [claude, ...meta, ...checkKnowledge(app.db), checkBackup(app)];
+}
+
+/**
+ * نسخة احتياطية حديثة.
+ *
+ * منع الحذف لا يحمي من تلف الملف ولا من ضياع الجهاز. النسخة هي الحماية
+ * الحقيقية، وغيابها عطل صامت مثل غيره.
+ */
+function checkBackup(app: App): HealthCheck {
+  const base = { key: 'backup', label: 'النسخة الاحتياطية' };
+  const row = app.db
+    .prepare(`SELECT created_at FROM health_log WHERE summary = 'backup' ORDER BY id DESC LIMIT 1`)
+    .get() as { created_at: string } | undefined;
+
+  if (!row) return { ...base, severity: 'warn', message: 'لم تُؤخذ نسخة بعد.' };
+
+  const hours = Math.round((Date.now() - new Date(`${row.created_at.replace(' ', 'T')}+03:00`).getTime()) / 3_600_000);
+  if (hours > 48) {
+    return { ...base, severity: 'warn', message: `آخر نسخة قبل ${hours} ساعة.`, fix: 'تحقّقي أن النظام يعمل باستمرار.' };
+  }
+  return { ...base, severity: 'ok', message: `آخر نسخة قبل ${hours} ساعة` };
 }
 
 export function worstOf(checks: HealthCheck[]): Severity {
