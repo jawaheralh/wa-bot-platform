@@ -38,7 +38,20 @@ export async function createServer(app: App): Promise<FastifyInstance> {
 
   await server.register(cookie, { secret: config.sessionSecret });
   await server.register(formbody);
-  await server.register(fastifyStatic, { root: join(ROOT, 'public'), prefix: '/' });
+  await server.register(fastifyStatic, {
+    root: join(ROOT, 'public'),
+    prefix: '/',
+    /**
+     * لا تخزين للواجهة.
+     *
+     * المتصفح يُبقي app.js القديم بعد كل تحديث، فتختفي شاشات أُضيفت
+     * للتو ويظن المستخدم أن الميزة لم تُبنَ. الملفات كيلوبايتات قليلة
+     * من القرص المحلي، فالتخزين لا يوفّر شيئاً يُذكر مقابل هذا الالتباس.
+     */
+    setHeaders(reply, path) {
+      if (/\.(js|css|html)$/.test(path)) reply.header('cache-control', 'no-cache, must-revalidate');
+    },
+  });
 
   /* --- الأخطاء تُعاد كرسائل عربية مفهومة لا كـstack --- */
   server.setErrorHandler(async (error, request, reply) => {
