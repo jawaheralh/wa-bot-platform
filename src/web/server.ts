@@ -71,6 +71,33 @@ export async function createServer(app: App): Promise<FastifyInstance> {
     }
   }
 
+  /**
+   * العنوان العام لا يُقدّم إلا الـwebhook.
+   *
+   * النفق يعرّض المنفذ كله، فتصبح لوحة التحكم على الإنترنت لمن يعرف
+   * العنوان — وكلمة مرور واحدة كل ما يفصله عن بيانات عملائك. Meta لا
+   * تحتاج إلا /webhook/whatsapp، فلا سبب لكشف ما عداه.
+   *
+   * التمييز بترويسة Host: الطلب من النفق يحملها باسم النطاق العام،
+   * ومن جهازك يحملها localhost.
+   */
+  if (config.publicUrl) {
+    const publicHost = new URL(config.publicUrl).host.toLowerCase();
+
+    server.addHook('onRequest', async (request, reply) => {
+      const host = String(request.headers.host ?? '').toLowerCase();
+      if (host !== publicHost) return;
+
+      const path = (request.url.split('?')[0] ?? '').toLowerCase();
+      if (path.startsWith('/webhook/')) return;
+
+      logger.warn('طلب مرفوض من العنوان العام', { مسار: path, مصدر: request.ip });
+      await reply.code(404).send({ error: 'غير موجود.' });
+    });
+
+    logger.info(`العنوان العام مقصور على /webhook — لوحة التحكم على ${config.host}:${config.port} فقط`);
+  }
+
   server.get('/api/health', async () => ({ ok: true, provider: provider.name }));
 
   /* --- الجلسة --- */
