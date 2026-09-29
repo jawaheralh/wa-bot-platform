@@ -149,6 +149,7 @@ export function applyBranding(branding) {
     for (const name of ['--accent', '--accent-dark', '--accent-soft', '--deep', '--accent-ink', '--bg', '--line']) {
       root.removeProperty(name);
     }
+    root.removeProperty('--brand-watermark');
     return;
   }
 
@@ -159,6 +160,18 @@ export function applyBranding(branding) {
   root.setProperty('--accent-ink', branding.accentInk);
   root.setProperty('--bg', branding.bg);
   root.setProperty('--line', branding.line);
+
+  /**
+   * الشعار خلف المحادثة كما تفعل خلفية واتساب.
+   *
+   * متغيّر لا وسم <img>: الخلفية لا تُنتقى ولا تُسحب ولا تدخل ترتيب
+   * القراءة لقارئ الشاشة، ووسمٌ حقيقي خلف الفقاعات يفعل الثلاثة.
+   */
+  if (branding.logoUrl) {
+    root.setProperty('--brand-watermark', `url("${branding.logoUrl}")`);
+  } else {
+    root.removeProperty('--brand-watermark');
+  }
 }
 
 /** يقرأ الهوية ويطبّقها. الفشل لا يمنع فتح اللوحة — تُعرض بألوان المنصة. */
