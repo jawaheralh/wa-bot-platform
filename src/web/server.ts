@@ -38,7 +38,9 @@ import { MODULES } from '../modules/registry.ts';
 import { unwrapProvider } from '../whatsapp/provider.ts';
 import { errorMessage } from '../logger.ts';
 import { audit } from '../compliance.ts';
-import { hashPassword } from '../tenants.ts';
+import { hashPassword, findUser } from '../tenants.ts';
+import { createReset, consumeReset, invalidateAll, resetMessage } from '../password-reset.ts';
+import { getTenant } from '../db/index.ts';
 
 export async function createServer(app: App): Promise<FastifyInstance> {
   const { db, config, logger, provider, notify } = app;
@@ -185,6 +187,111 @@ export async function createServer(app: App): Promise<FastifyInstance> {
     }
     // الفخّ يُعامَل كالنجاح: إخبار الآلة بأنها كُشفت يجعلها تعيد المحاولة.
     return { ok: true };
+  });
+
+  /**
+   * يوصل الرمز إلى صاحبه.
+   *
+   * عبر رقم منشأته: هي الجهة التي يعرفها الموظف، ورؤيته الرمز آتياً من
+   * رقم مطعمه لا من رقم غريب هي نصف الثقة. وأدمن النظام بلا منشأة،
+   * فيُرسل له من أول منشأة موصولة.
+   */
+  async function sendResetCode(app: App, user: { tenant_id: number | null; wa_number: string | null }, code: string) {
+    const tenantId = user.tenant_id ?? firstConnectedTenant();
+    if (!tenantId) throw new Error('لا توجد منشأة موصولة لإرسال الرمز منها.');
+
+    const tenant = getTenant(db, tenantId);
+    const brand = user.tenant_id ? (tenant?.name ?? config.brandName) : config.brandName;
+    await app.provider.sendText(tenantId, user.wa_number!, resetMessage(code, brand));
+  }
+
+  /** أول منشأة نشطة — لأدمن النظام الذي لا يتبع منشأة. */
+  function firstConnectedTenant(): number | null {
+    const row = db
+      .prepare(`SELECT id FROM tenants WHERE status = 'active' ORDER BY id LIMIT 1`)
+      .get() as { id: number } | undefined;
+    return row?.id ?? null;
+  }
+
+  /* ---------------------------------------------------------------
+     استرجاع كلمة المرور
+  --------------------------------------------------------------- */
+
+  /**
+   * الردّ واحد دائماً.
+   *
+   * «لا يوجد مستخدم بهذا الاسم» تحوّل النموذج إلى أداة جردٍ لأسماء
+   * المستخدمين. فالجواب هو نفسه سواء وُجد الحساب أم لا، وسواء كان له
+   * رقم أم لا — والفرق كله في السجل عندنا.
+   */
+  server.post('/api/forgot', async (request) => {
+    const body = (request.body ?? {}) as { username?: string };
+    const username = String(body.username ?? '').trim();
+    checkLoginRate(request.ip);
+
+    const same = {
+      ok: true,
+      message: 'إن كان الحساب موجوداً ومسجَّلاً برقم جوال، وصلك رمز على واتساب.',
+    };
+
+    const user = username ? findUser(db, username) : undefined;
+    if (!user || !user.active || !user.wa_number) {
+      recordLoginFailure(request.ip);
+      logger.warn('طلب استرجاع لحساب غير صالح', { مستخدم: username, مصدر: request.ip });
+      return same;
+    }
+
+    const { code } = createReset(db, user);
+    try {
+      await sendResetCode(app, user, code);
+      logger.info('أُرسل رمز استرجاع', { مستخدم: user.username });
+    } catch (error) {
+      // الفشل لا يُقال للطالب: إخباره أن الإرسال فشل يخبره أن الحساب موجود.
+      logger.error('تعذّر إرسال رمز الاسترجاع', error, { مستخدم: user.username });
+    }
+
+    audit(db, {
+      tenantId: user.tenant_id,
+      username: user.username,
+      action: 'password_reset_requested',
+      ip: request.ip,
+    });
+    return same;
+  });
+
+  server.post('/api/reset', async (request) => {
+    const body = (request.body ?? {}) as { username?: string; code?: string; password?: string };
+    checkLoginRate(request.ip);
+
+    const password = String(body.password ?? '');
+    if (password.length < 8) {
+      throw Object.assign(new Error('كلمة المرور يجب ألّا تقل عن ٨ أحرف.'), { statusCode: 400 });
+    }
+
+    const user = findUser(db, String(body.username ?? '').trim());
+    // الرمز يُفحص حتى لو لم يوجد المستخدم، فلا يفرّق الزمن بين الحالتين.
+    const outcome = user
+      ? consumeReset(db, user.id, String(body.code ?? ''))
+      : { ok: false, message: 'الرمز غير صحيح أو انتهت صلاحيته.' };
+
+    if (!outcome.ok || !user) {
+      recordLoginFailure(request.ip);
+      throw Object.assign(new Error(outcome.message), { statusCode: 400 });
+    }
+
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(password), user.id);
+    invalidateAll(db, user.id);
+
+    audit(db, {
+      tenantId: user.tenant_id,
+      userId: user.id,
+      username: user.username,
+      action: 'password_changed',
+      ip: request.ip,
+    });
+    logger.info('غُيّرت كلمة المرور بالاسترجاع', { مستخدم: user.username });
+
+    return { ok: true, message: 'غُيّرت كلمة المرور. سجّل الدخول بها الآن.' };
   });
 
   /* --- الجلسة --- */

@@ -56,6 +56,7 @@ export const ACTION_AR: Record<string, string> = {
   wa_profile_photo: 'تغيير صورة رقم واتساب',
   staff_change: 'تعديل موظف',
   password_changed: 'تغيير كلمة المرور',
+  password_reset_requested: 'طلب استرجاع كلمة المرور',
   totp_enabled: 'تفعيل التحقق بخطوتين',
   totp_disabled: 'تعطيل التحقق بخطوتين',
   totp_failed: 'رمز تحقق خاطئ',

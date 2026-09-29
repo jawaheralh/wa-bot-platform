@@ -189,6 +189,18 @@ export const CORE_TABLES: string[] = [
     created_at      TEXT    NOT NULL DEFAULT (${SQL_NOW})
   )`,
   `CREATE INDEX IF NOT EXISTS idx_alerts_tenant ON alerts(tenant_id, seen, id DESC)`,
+  /* --- رموز استرجاع كلمة المرور --- */
+  `CREATE TABLE IF NOT EXISTS password_resets (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    -- الرمز مُجزّأ لا نصاً: من يقرأ القاعدة لا يدخل بحساب أحد.
+    code_hash  TEXT    NOT NULL,
+    attempts   INTEGER NOT NULL DEFAULT 0,
+    expires_at TEXT    NOT NULL,
+    used_at    TEXT,
+    created_at TEXT    NOT NULL DEFAULT (${SQL_NOW})
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_resets_user ON password_resets(user_id, used_at)`,
 ];
 
 
