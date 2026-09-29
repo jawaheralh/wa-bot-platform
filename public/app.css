@@ -280,6 +280,17 @@ label.inline input { width: auto; }
   background-position: 0 0, 8px 8px;
 }
 .logo-box img { max-width: 180px; max-height: 90px; object-fit: contain; }
+.logo-box { position: relative; cursor: pointer; transition: border-color .12s ease; }
+.logo-box:hover { border-color: var(--accent); }
+
+/* حال السحب فوق المربّع: الحدّ يمتلئ وتظهر كلمة «أفلِت» فوق ما بداخله */
+.drop-hint {
+  position: absolute; inset: 0; display: none;
+  place-items: center; border-radius: var(--radius);
+  background: var(--accent-soft); color: var(--accent-dark); font-weight: 600;
+}
+.logo-box.over { border-style: solid; border-color: var(--accent); }
+.logo-box.over .drop-hint { display: grid; }
 
 /* معاينة مصغّرة للوحة نفسها — لا صورة ثابتة تكذب بعد أول تعديل */
 .preview { display: flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
