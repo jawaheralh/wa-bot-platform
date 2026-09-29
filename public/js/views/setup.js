@@ -78,16 +78,34 @@ export async function renderSetup(main) {
 
       ${
         status.numbers?.length
-          ? `<h3 style="margin-top:16px">الأرقام لدى Meta</h3>
+          ? `<h3 style="margin-top:16px">كل منشأة وإعدادها</h3>
+             <p class="muted" style="margin-top:0">
+               «خاصة» = المنشأة تستعمل توكن حسابها هي. «مشتركة» = ترث
+               إعدادات النظام العامة — وهذا لا يصلح لعميل يدفع.
+             </p>
              <div class="table-wrap"><table><tbody>${status.numbers
                .map(
                  (n) => `<tr>
                    <td style="width:40px">${n.ok ? '<span class="badge green">✓</span>' : '<span class="badge red">✗</span>'}</td>
-                   <td style="width:180px">${esc(n.tenant)}</td>
+                   <td style="width:200px">${esc(n.tenant)}</td>
+                   <td style="width:90px">${
+                     n.own
+                       ? '<span class="badge green">خاصة</span>'
+                       : '<span class="badge amber">مشتركة</span>'
+                   }</td>
                    <td class="muted">${esc(n.message)}</td>
                  </tr>`,
                )
-               .join('')}</tbody></table></div>`
+               .join('')}</tbody></table></div>
+             ${
+               status.numbers.some((n) => !n.own)
+                 ? `<p class="muted" style="margin-top:10px">
+                      ⚠️ منشأة على الإعدادات المشتركة تستهلك من توكنك ومن
+                      حساب Claude العام، ويظهر رقمها تحت تطبيقك أنت.
+                      افتحي «كل المنشآت» وأدخلي لها توكن حسابها ومفتاحها.
+                    </p>`
+                 : ''
+             }`
           : ''
       }
 
@@ -102,7 +120,11 @@ export async function renderSetup(main) {
     </div>
 
     <div class="card">
-      <h3>القيم</h3>
+      <h3>الإعدادات المشتركة</h3>
+      <p class="muted" style="margin-top:0">
+        هذه تخصّ النظام كله لا منشأة بعينها. إعدادات كل منشأة — توكن Meta،
+        ورقمها، ومفتاح Claude الخاص بها — في شاشة <strong>كل المنشآت</strong>.
+      </p>
       ${settings.fields
         .map(
           (f) => `
