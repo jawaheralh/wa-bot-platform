@@ -409,3 +409,41 @@ describe('الرسائل الصوتية', () => {
     harness = { app, provider, db, claude, send: async () => {}, replies: () => [] };
   });
 });
+
+describe('عدم تكرار عبارة التحويل', () => {
+  it('النموذج أعلن التحويل بنفسه ⇐ لا تُضاف عبارة النظام', async () => {
+    harness = await setup([
+      {
+        text: 'أكيد، بحوّلك لأحد الموظفين',
+        toolCalls: [{ name: 'handoff_to_human', input: { reason: 'طلب موظفاً' } }],
+      },
+    ]);
+    await harness.send('أبغى أكلم موظف');
+
+    const reply = harness.replies()[0]!;
+    expect(reply).toBe('أكيد، بحوّلك لأحد الموظفين');
+    expect(reply).not.toContain('حوّلتك للموظف المختص');
+  });
+
+  it('النموذج اعتذر بلا ذكر التحويل ⇐ تُضاف عبارة النظام', async () => {
+    harness = await setup([
+      {
+        text: 'أعتذر، ما عندي معلومة مؤكدة عن هذا.',
+        toolCalls: [{ name: 'handoff_to_human', input: { reason: 'سؤال خارج المعرفة' } }],
+      },
+    ]);
+    await harness.send('كم رأس مالكم؟');
+
+    const reply = harness.replies()[0]!;
+    expect(reply).toContain('أعتذر، ما عندي معلومة مؤكدة');
+    expect(reply).toContain('حوّلتك للموظف المختص');
+  });
+
+  it('النموذج صمت ⇐ عبارة النظام وحدها تصل العميل', async () => {
+    harness = await setup([
+      { toolCalls: [{ name: 'handoff_to_human', input: { reason: 'س' } }] },
+    ]);
+    await harness.send('سؤال');
+    expect(harness.replies()[0]).toBe('حوّلتك للموظف المختص، بيتواصل معك في أقرب وقت. شكراً لصبرك.');
+  });
+});

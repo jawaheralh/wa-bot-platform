@@ -29,6 +29,26 @@ import type { Transcriber } from '../stt/index.ts';
 /** أكثر من هذا يعني أن النموذج يدور في حلقة، لا أنه يحتاج خطوة إضافية. */
 const MAX_TOOL_ROUNDS = 5;
 
+/** ألفاظ تدل على أن النموذج أعلن التحويل بنفسه. */
+const HANDOFF_WORDS = /حوّل|حول|أحول|بحول|يتواصل|بيتواصل|راح يتواصل|للموظف|موظف مختص/;
+
+/**
+ * يدمج نص النموذج مع نص الأداة بلا تكرار المعنى.
+ *
+ * نص التحويل من الأداة ضمانة: العميل يجب أن يعلم أنه حُوّل مهما قال
+ * النموذج. لكن حين يعلنها النموذج بنفسه («أبشر، بحوّلك لموظف») يصل
+ * العميل جملتان تقولان الشيء نفسه فتبدوان آلية ركيكة.
+ *
+ * الترجيح مقصود: إن أخطأ الكشف فتُركت الجملتان، فالضرر ركاكة؛ ولو
+ * أسقطنا الضمانة لفقد العميل معلومة أنه حُوّل أصلاً.
+ */
+export function joinWithoutRepeating(modelText: string, toolMessage: string): string {
+  const text = modelText.trim();
+  if (!text) return toolMessage;
+  if (HANDOFF_WORDS.test(text)) return text;
+  return `${text}\n\n${toolMessage}`;
+}
+
 export interface EngineOptions {
   app: App;
   claude: ClaudeClient;
@@ -170,7 +190,7 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
 
         if (stopMessage) {
           // أداة طلبت إنهاء الدورة بنص محدد (التحويل للموظف) — لا نعيد سؤال النموذج.
-          reply = [result.text, stopMessage].filter(Boolean).join('\n\n');
+          reply = joinWithoutRepeating(result.text, stopMessage);
           break;
         }
 
