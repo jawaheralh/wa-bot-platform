@@ -67,6 +67,7 @@ export interface AppConfig {
   provider: ProviderName;
   /** رقم الدعم الذي يظهر لأدمن المنشأة عند الوحدات المعطّلة. */
   supportWhatsApp: string;
+  platformWaTenant: number | null;
   anthropicApiKey: string;
   anthropicModel: string;
   /** تحويل الرسائل الصوتية لنص — يُعطَّل تلقائياً إذا لم يوجد مفتاح. */
@@ -171,6 +172,12 @@ export function loadConfig(): AppConfig {
      * تختفي أزرار التواصل كلها بدل أن تقود إلى رقم غريب.
      */
     supportWhatsApp: str('SUPPORT_WHATSAPP').replace(/[^\d]/g, ''),
+    /**
+     * رقم المنصة للرسائل التي لا تخصّ منشأة — رمز استرجاع أدمن
+     * النظام مثلاً. يُحدَّد برقم المنشأة التي يُرسل من رقمها.
+     * الفارغ يعني «اختر أول منشأة تستطيع الإرسال».
+     */
+    platformWaTenant: num('PLATFORM_WA_TENANT', 0) || null,
     anthropicApiKey: str('ANTHROPIC_API_KEY'),
     anthropicModel: str('ANTHROPIC_MODEL', 'claude-sonnet-5'),
     transcription: {

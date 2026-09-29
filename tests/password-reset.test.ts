@@ -214,3 +214,34 @@ describe('الأثر في السجل', () => {
     expect(saraId).toBeGreaterThan(0);
   });
 });
+
+describe('رقم المنصة', () => {
+  /**
+   * أدمن النظام لا منشأة له، فيُرسل له من رقم منشأة.
+   *
+   * و«أول منشأة» لا تكفي معياراً: أول منشأة بالترتيب قد تكون منشأة
+   * تجربة بلا توكن Meta، فيفشل الإرسال صامتاً ولا يصل الأدمن رمزه —
+   * عطلٌ لا يُكتشف إلا يوم يحتاجه.
+   */
+  it('يُرسل لأدمن النظام من منشأة تستطيع الإرسال لا من أول منشأة', async () => {
+    // «مطعم الركن» أقدم بالترتيب وبلا بيانات Meta، والموصولة بعده.
+    const connected = seedTenant(db, { name: 'منشأة موصولة', waNumber: '966500000009' }).id;
+    expect(connected).toBeGreaterThan(tenantId);
+    db.prepare(
+      `UPDATE tenants SET wa_phone_number_id = '999', wa_access_token = 'T', wa_app_secret = 'S' WHERE id = ?`,
+    ).run(connected);
+
+    createUser(db, {
+      tenantId: null,
+      username: 'root',
+      password: 'root12345678',
+      role: 'system',
+    });
+    db.prepare(`UPDATE users SET wa_number = '966559998877' WHERE username = 'root'`).run();
+
+    await post('/api/forgot', { username: 'root' });
+
+    expect(provider.outbox).toHaveLength(1);
+    expect(provider.outbox[0]!.tenantId).toBe(connected);
+  });
+});

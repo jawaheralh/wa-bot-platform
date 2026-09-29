@@ -40,7 +40,8 @@ import { errorMessage } from '../logger.ts';
 import { audit } from '../compliance.ts';
 import { hashPassword, findUser } from '../tenants.ts';
 import { createReset, consumeReset, invalidateAll, resetMessage } from '../password-reset.ts';
-import { getTenant } from '../db/index.ts';
+import { getTenant, type TenantRow } from '../db/index.ts';
+import { credentialsFor } from '../tenant-meta.ts';
 
 export async function createServer(app: App): Promise<FastifyInstance> {
   const { db, config, logger, provider, notify } = app;
@@ -197,7 +198,7 @@ export async function createServer(app: App): Promise<FastifyInstance> {
    * فيُرسل له من أول منشأة موصولة.
    */
   async function sendResetCode(app: App, user: { tenant_id: number | null; wa_number: string | null }, code: string) {
-    const tenantId = user.tenant_id ?? firstConnectedTenant();
+    const tenantId = user.tenant_id ?? platformSender();
     if (!tenantId) throw new Error('لا توجد منشأة موصولة لإرسال الرمز منها.');
 
     const tenant = getTenant(db, tenantId);
@@ -205,12 +206,32 @@ export async function createServer(app: App): Promise<FastifyInstance> {
     await app.provider.sendText(tenantId, user.wa_number!, resetMessage(code, brand));
   }
 
-  /** أول منشأة نشطة — لأدمن النظام الذي لا يتبع منشأة. */
-  function firstConnectedTenant(): number | null {
-    const row = db
-      .prepare(`SELECT id FROM tenants WHERE status = 'active' ORDER BY id LIMIT 1`)
-      .get() as { id: number } | undefined;
-    return row?.id ?? null;
+  /**
+   * الرقم الذي ترسل منه المنصة نفسها.
+   *
+   * لأدمن النظام لا منشأة، فيلزم رقمٌ يُرسل منه. و«أول منشأة» لا تكفي
+   * معياراً: أول منشأة بالرقم قد تكون منشأة تجربة بلا توكن Meta، فيفشل
+   * الإرسال صامتاً ولا يصل الأدمن رمزه أبداً — وهو عطل لا يُكتشف إلا
+   * يوم يحتاجه.
+   *
+   * فالاختيار: ما تحدّده PLATFORM_WA_TENANT إن حُدّد، وإلا أول منشأة
+   * **تستطيع الإرسال فعلاً**، وإلا أول نشطة (يكفي للمحاكي وBaileys).
+   */
+  function platformSender(): number | null {
+    if (config.platformWaTenant) {
+      const chosen = getTenant(db, config.platformWaTenant);
+      if (chosen && chosen.status === 'active') return chosen.id;
+      logger.warn('PLATFORM_WA_TENANT يشير لمنشأة غير موجودة أو موقوفة', {
+        قيمة: String(config.platformWaTenant),
+      });
+    }
+
+    const active = db
+      .prepare(`SELECT * FROM tenants WHERE status = 'active' ORDER BY id`)
+      .all() as TenantRow[];
+
+    const ready = active.find((t) => t.wa_phone_number_id && credentialsFor(config, t).accessToken);
+    return ready?.id ?? active[0]?.id ?? null;
   }
 
   /* ---------------------------------------------------------------
