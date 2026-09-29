@@ -78,8 +78,24 @@ export interface BotModule {
   /** يتحقق مما يرسله الأدمن ويرمي Error برسالة عربية عند الخطأ. */
   validateConfig(input: unknown): ModuleConfig;
 
-  /** جزء الـsystem prompt الخاص بالوحدة — يُضاف فقط إن كانت مفعّلة. */
+  /**
+   * جزء الـsystem prompt الخاص بالوحدة — يُضاف فقط إن كانت مفعّلة.
+   *
+   * يجب أن يكون **ثابتاً للمنشأة**: هذا الجزء يُخزَّن مؤقتاً لدى
+   * Anthropic ويُقرأ بعُشر السعر. أي قيمة تتغيّر بين محادثة وأخرى
+   * تُبطل التخزين في كل رسالة وتضاعف الكلفة — محلّها contextPrompt.
+   */
   systemPrompt(ctx: ModuleContext): string;
+
+  /**
+   * حالة هذه المحادثة بعينها — بعد نقطة التخزين المؤقت.
+   *
+   * وُجد لأن البوت كان يجهل ما جرى للشكوى بعد تسجيلها: العميل يعيد
+   * ذكر شكواه بعد إغلاقها، فيقرأ النموذج تاريخ المحادثة وحده ويقول
+   * «مسجّلة ويتابعها المسؤول» — وهي مُغلقة. لا يكذب النموذج، بل لم
+   * يُخبره أحد.
+   */
+  contextPrompt?(ctx: ModuleContext): string;
   /** الأدوات التي تراها Claude — القائمة قد تعتمد على الإعدادات. */
   tools(ctx: ModuleContext): ToolDefinition[];
   runTool(name: string, input: Record<string, unknown>, ctx: ModuleContext): Promise<ToolResult>;

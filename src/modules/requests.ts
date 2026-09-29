@@ -283,7 +283,45 @@ export const requestsModule: BotModule = {
 - بعد التسجيل اذكر رقم الطلب كما أعادته الأداة بالضبط، وأخبره أنه سيصله
   تحديث على الواتساب عند أي تغيير.
 - إذا سأل عن طلب سابق بذكر رقمه، استعمل get_request_status.
-- لا تَعِد بموعد إنجاز ولا بسعر لم يرد في معرفة المنشأة.`;
+- لا تَعِد بموعد إنجاز ولا بسعر لم يرد في معرفة المنشأة.
+
+### الطلبات القائمة لهذا العميل
+ستصلك قائمة بطلباته وحالتها. اعمل بها:
+- طلب **جارٍ** عن نفس الموضوع ⇐ لا تسجّل جديداً، اذكر رقمه وحالته.
+- طلب **منجَز أو ملغى** يعود العميل لذكره ⇐ **سجّل طلباً جديداً**،
+  فعودته تعني حاجة جديدة أو أن الأولى لم تُنجَز فعلاً. ولا تقل عن
+  المنجَز إنه «قيد التنفيذ».`;
+  },
+
+  /**
+   * حالة طلبات هذا العميل — بعد نقطة التخزين المؤقت.
+   *
+   * نفس علّة الشكاوى: بلا هذا يقرأ النموذج تاريخ المحادثة وحده،
+   * فيخبر العميل أن طلباً أُنجز أو أُلغي ما زال «قيد التنفيذ».
+   */
+  contextPrompt(ctx: ModuleContext): string {
+    if (!ctx.conversation) return '';
+
+    const rows = ctx.db
+      .prepare(
+        `SELECT reference, status, substr(summary, 1, 80) AS summary, created_at
+           FROM requests
+          WHERE tenant_id = ? AND customer_wa = ?
+          ORDER BY id DESC LIMIT 5`,
+      )
+      .all(ctx.tenant.id, ctx.conversation.customer_wa) as {
+      reference: string;
+      status: string;
+      summary: string;
+      created_at: string;
+    }[];
+
+    if (rows.length === 0) return '';
+
+    const lines = rows.map(
+      (r) => `- ${r.reference} · ${STATUS_AR[r.status as Status] ?? r.status} · ${r.created_at} · ${r.summary}`,
+    );
+    return ['## طلبات هذا العميل المسجّلة', ...lines].join('\n');
   },
 
   tools(ctx: ModuleContext): ToolDefinition[] {

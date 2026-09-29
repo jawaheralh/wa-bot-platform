@@ -195,7 +195,50 @@ export const complaintsModule: BotModule = {
 - severity: high إذا كان العميل غاضباً بوضوح، أو تضرّر مالياً أو صحياً، أو هدّد بالتصعيد أو بشكوى رسمية. medium للمشكلة الواضحة بلا غضب. low للملاحظة العابرة.
 - بعد التسجيل، اذكر الرقم المرجعي للعميل كما أعادته الأداة بالضبط.
 - إذا سأل عن شكوى سابقة وذكر رقمها، استعمل get_complaint_status.
-- لا تَعِد بحل ولا بمدة ولا بتعويض — التسجيل والتصعيد فقط.`;
+- لا تَعِد بحل ولا بمدة ولا بتعويض — التسجيل والتصعيد فقط.
+
+### الشكاوى القائمة لهذا العميل
+ستصلك قائمة بشكاواه وحالتها. اعمل بها:
+- شكوى **مفتوحة أو قيد المعالجة** عن نفس الموضوع ⇐ لا تسجّل جديدة.
+  اذكر رقمها وقل إنها ما زالت قيد المتابعة.
+- شكوى **مغلقة** يعود العميل لذكرها ⇐ **سجّل شكوى جديدة**، فعودته
+  بعد الإغلاق تعني أن المشكلة تكرّرت أو لم تُحل. اذكر الرقم الجديد،
+  وأشر إلى أن السابقة أُغلقت. ولا تقل إن المغلقة «قيد المتابعة».
+- موضوع مختلف ⇐ شكوى جديدة دائماً.`;
+  },
+
+  /**
+   * حالة شكاوى هذا العميل — بعد نقطة التخزين المؤقت.
+   *
+   * بدونها يقرأ النموذج تاريخ المحادثة وحده: يرى أنه سجّل
+   * SHK-2026-000003 قبل ساعة فيقول «مسجّلة ويتابعها المسؤول» — وقد
+   * أُغلقت بينهما. لا يكذب النموذج، بل لم يُخبره أحد.
+   */
+  contextPrompt(ctx: ModuleContext): string {
+    if (!ctx.conversation) return '';
+
+    const rows = ctx.db
+      .prepare(
+        `SELECT reference, status, severity, substr(summary, 1, 80) AS summary, created_at
+           FROM complaints
+          WHERE tenant_id = ? AND customer_wa = ?
+          ORDER BY id DESC LIMIT 5`,
+      )
+      .all(ctx.tenant.id, ctx.conversation.customer_wa) as {
+      reference: string;
+      status: string;
+      severity: string;
+      summary: string;
+      created_at: string;
+    }[];
+
+    if (rows.length === 0) return '';
+
+    const lines = rows.map(
+      (r) => `- ${r.reference} · ${STATUS_AR[r.status as Status] ?? r.status} · ${r.created_at} · ${r.summary}`,
+    );
+
+    return ['## شكاوى هذا العميل المسجّلة', ...lines].join('\n');
   },
 
   tools(): ToolDefinition[] {

@@ -181,6 +181,19 @@ export function composePrompt(enabled: EnabledModule[], base: ContextBase): stri
 }
 
 /**
+ * سياق هذه المحادثة من الوحدات المفعّلة.
+ *
+ * يُركَّب بعد نقطة التخزين المؤقت، فيجوز أن يتغيّر بين رسالة وأخرى
+ * بلا أن يُبطل تخزين الـprompt الثابت.
+ */
+export function composeContext(enabled: EnabledModule[], base: ContextBase): string {
+  return enabled
+    .map(({ module, config }) => module.contextPrompt?.({ ...base, config })?.trim() ?? '')
+    .filter((part) => part.length > 0)
+    .join('\n\n');
+}
+
+/**
  * اتحاد أدوات الوحدات المفعّلة.
  * تضارب الأسماء بين وحدتين خطأ برمجي لا خطأ تشغيل، فنسجّله ونُبقي الأولى
  * حسب ترتيب MODULES بدل أن نُسقط الرسالة على العميل.

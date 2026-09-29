@@ -19,7 +19,7 @@ import {
   silenceConversation,
   type TenantRow,
 } from '../db/index.ts';
-import { composePrompt, composeTools, dispatchTool, enabledFor } from '../modules/registry.ts';
+import { composePrompt, composeContext, composeTools, dispatchTool, enabledFor } from '../modules/registry.ts';
 import { basePrompt, volatilePrompt, FALLBACK_REPLY, VOICE_DISABLED_REPLY } from './prompt.ts';
 import { buildHistory } from './history.ts';
 import { now } from '../time.ts';
@@ -198,6 +198,9 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
 
     const systemVolatile = [
       volatilePrompt(nowSql),
+      // حالة الشكاوى والطلبات الجارية لهذه المحادثة — متغيّرة، فمحلّها
+      // هنا لا في الـprompt المخزَّن.
+      composeContext(enabled, base),
       media && !visionImage
         ? `أرسل العميل ${MEDIA_AR[media.kind]}${media.filename ? ` باسم «${media.filename}»` : ''}. ` +
           'لا تستطيع فتحه، لكنه محفوظ ويراه الموظف في اللوحة. أقرّ باستلامه، ' +
