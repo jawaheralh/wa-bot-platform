@@ -1,0 +1,15 @@
+[Unit]
+Description=نسخة احتياطية لقاعدة بوت واتساب إلى تخزين أوراكل
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=wabot
+Group=wabot
+WorkingDirectory=/opt/wa-bot
+ExecStart=/bin/bash /opt/wa-bot/deploy/backup-remote.sh
+# الفشل يظهر في journalctl -u wa-bot-backup، وفحص الصحة يلتقط
+# انقطاع النسخ لأكثر من يومين.
+StandardOutput=journal
+StandardError=journal
