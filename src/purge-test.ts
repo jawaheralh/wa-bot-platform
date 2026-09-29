@@ -114,6 +114,93 @@ export function applyPlan(db: Db, plan: Plan, dbPath: string): void {
   db.exec('VACUUM');
 }
 
+/* ---------------------------------------------------------------
+   حذف منشأة تجريبية كاملة
+--------------------------------------------------------------- */
+
+export interface TenantPlan {
+  id: number;
+  name: string;
+  counts: Record<string, number>;
+  users: string[];
+}
+
+export function planTenant(db: Db, tenantId: number): TenantPlan {
+  const tenant = db.prepare('SELECT id, name FROM tenants WHERE id = ?').get(tenantId) as
+    | { id: number; name: string }
+    | undefined;
+  if (!tenant) throw new Error(`لا توجد منشأة رقم ${tenantId}`);
+
+  const n = (sql: string): number => (db.prepare(sql).get(tenantId) as { n: number }).n;
+  const users = (db.prepare('SELECT username FROM users WHERE tenant_id = ?').all(tenantId) as {
+    username: string;
+  }[]).map((u) => u.username);
+
+  return {
+    id: tenant.id,
+    name: tenant.name,
+    users,
+    counts: {
+      محادثات: n('SELECT COUNT(*) n FROM conversations WHERE tenant_id = ?'),
+      رسائل: n(
+        'SELECT COUNT(*) n FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE tenant_id = ?)',
+      ),
+      قاعدة_المعرفة: n('SELECT COUNT(*) n FROM kb_entries WHERE tenant_id = ?'),
+      مستخدمون: users.length,
+      وحدات: n('SELECT COUNT(*) n FROM tenant_modules WHERE tenant_id = ?'),
+      تنبيهات: n('SELECT COUNT(*) n FROM alerts WHERE tenant_id = ?'),
+      سجل_تدقيق: n('SELECT COUNT(*) n FROM audit_log WHERE tenant_id = ?'),
+    },
+  };
+}
+
+/**
+ * يحذف منشأة وكل أثرها.
+ *
+ * الجداول تُعدَّد من قاعدة البيانات لا من قائمة مكتوبة: وحدة جديدة
+ * تضيف جدولاً بعمود tenant_id، والقائمة المكتوبة تنساه فيبقى صفّ
+ * يتيم يحمل اسم عميل حُذف — وهو بالضبط ما لا يجوز عند الحذف.
+ */
+export function dropTenant(db: Db, tenantId: number): string[] {
+  const touched: string[] = [];
+
+  const tables = (db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+    .all() as { name: string }[]).map((t) => t.name);
+
+  db.transaction(() => {
+    // ما يرتبط بالمحادثات أولاً: حذف المحادثة قبلها يقطع الصلة فتبقى.
+    for (const table of tables) {
+      if (table === 'conversations' || table === 'tenants') continue;
+      const cols = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
+      if (!cols.includes('conversation_id')) continue;
+      const info = db
+        .prepare(
+          `DELETE FROM ${table} WHERE conversation_id IN (SELECT id FROM conversations WHERE tenant_id = ?)`,
+        )
+        .run(tenantId);
+      if (info.changes) touched.push(`${table}: ${info.changes}`);
+    }
+
+    for (const table of tables) {
+      if (table === 'tenants') continue;
+      const cols = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
+      if (!cols.includes('tenant_id')) continue;
+      const info = db.prepare(`DELETE FROM ${table} WHERE tenant_id = ?`).run(tenantId);
+      if (info.changes) touched.push(`${table}: ${info.changes}`);
+    }
+
+    // العدّادات مفاتيحها نصية بصيغة PREFIX:tenantId:year
+    const counters = db.prepare("DELETE FROM counters WHERE scope LIKE ?").run(`%:${tenantId}:%`);
+    if (counters.changes) touched.push(`counters: ${counters.changes}`);
+
+    const tenant = db.prepare('DELETE FROM tenants WHERE id = ?').run(tenantId);
+    if (tenant.changes) touched.push(`tenants: ${tenant.changes}`);
+  })();
+
+  return touched;
+}
+
 /* --- التشغيل من سطر الأوامر --- */
 
 if (process.argv[1]?.endsWith('purge-test.ts')) {
@@ -124,8 +211,38 @@ if (process.argv[1]?.endsWith('purge-test.ts')) {
     if (args[i] === '--keep' && args[i + 1]) keep.push(args[i + 1]!);
   }
 
+  const dropIds: number[] = [];
+  for (let i = 0; i < args.length; i += 1) {
+    if (args[i] === '--drop-tenant' && args[i + 1]) dropIds.push(Number(args[i + 1]));
+  }
+
   const config = loadConfig();
   const db = openDb(config.dbPath);
+
+  /* --- حذف منشآت كاملة --- */
+  if (dropIds.length) {
+    for (const id of dropIds) {
+      const plan = planTenant(db, id);
+      console.log(`\n═══ منشأة ستُحذف كاملة: [${plan.id}] ${plan.name} ═══`);
+      for (const [label, count] of Object.entries(plan.counts)) {
+        console.log(`  ${label.replace(/_/g, ' ').padEnd(16)} ${count}`);
+      }
+      console.log(`  المستخدمون:     ${plan.users.join(' · ') || '—'}`);
+
+      if (apply) {
+        const touched = dropTenant(db, id);
+        console.log(`  ✓ حُذفت — ${touched.join(' · ')}`);
+      }
+    }
+    if (!apply) console.log('\nعرض فقط. للتنفيذ أضيفي --apply\n');
+    else {
+      db.exec('VACUUM');
+      console.log('\n✓ تم.\n');
+    }
+    db.close();
+    process.exit(0);
+  }
+
   const plan = buildPlan(db, keep);
 
   console.log('\n═══ أرقام تبقى ═══');
