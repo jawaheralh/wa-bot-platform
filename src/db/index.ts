@@ -104,6 +104,8 @@ export interface ConversationRow {
   viewing_at: string | null;
   /** ١ = محادثة تجربة، يجوز حذفها من زر «حذف بيانات التجربة». */
   is_test: number;
+  /** آخر متابعة قبل إغلاق النافذة — يمنع تكرارها لنفس النافذة. */
+  followup_at: string | null;
   last_message_at: string | null;
   created_at: string;
 }

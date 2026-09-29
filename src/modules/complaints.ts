@@ -207,6 +207,24 @@ export const complaintsModule: BotModule = {
 - موضوع مختلف ⇐ شكوى جديدة دائماً.`;
   },
 
+  /** الشكاوى المفتوحة — صاحبها ينتظر ولا يجوز أن يُغلق بابه بصمت. */
+  pendingFor(ctx: ModuleContext): string[] {
+    if (!ctx.conversation) return [];
+    const rows = ctx.db
+      .prepare(
+        `SELECT reference, status, substr(summary, 1, 60) AS summary
+           FROM complaints
+          WHERE tenant_id = ? AND customer_wa = ? AND status IN ('new', 'in_progress')
+          ORDER BY id DESC LIMIT 3`,
+      )
+      .all(ctx.tenant.id, ctx.conversation.customer_wa) as {
+      reference: string;
+      status: string;
+      summary: string;
+    }[];
+    return rows.map((r) => `شكوى ${r.reference} (${STATUS_AR[r.status as Status] ?? r.status}): ${r.summary}`);
+  },
+
   /**
    * حالة شكاوى هذا العميل — بعد نقطة التخزين المؤقت.
    *

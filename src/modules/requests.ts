@@ -316,6 +316,24 @@ export const requestsModule: BotModule = {
   المنجَز إنه «قيد التنفيذ».`;
   },
 
+  /** الطلبات التي ما زالت جارية — من ينتظرها يستحق متابعة. */
+  pendingFor(ctx: ModuleContext): string[] {
+    if (!ctx.conversation) return [];
+    const rows = ctx.db
+      .prepare(
+        `SELECT reference, status, substr(summary, 1, 60) AS summary
+           FROM requests
+          WHERE tenant_id = ? AND customer_wa = ? AND status IN ('new', 'in_progress')
+          ORDER BY id DESC LIMIT 3`,
+      )
+      .all(ctx.tenant.id, ctx.conversation.customer_wa) as {
+      reference: string;
+      status: string;
+      summary: string;
+    }[];
+    return rows.map((r) => `طلب ${r.reference} (${STATUS_AR[r.status as Status] ?? r.status}): ${r.summary}`);
+  },
+
   /**
    * حالة طلبات هذا العميل — بعد نقطة التخزين المؤقت.
    *

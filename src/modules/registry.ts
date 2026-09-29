@@ -193,6 +193,19 @@ export function composeContext(enabled: EnabledModule[], base: ContextBase): str
     .join('\n\n');
 }
 
+/** البنود المعلّقة لهذا العميل من كل الوحدات المفعّلة. */
+export function composePending(enabled: EnabledModule[], base: ContextBase): string[] {
+  const out: string[] = [];
+  for (const { module, config } of enabled) {
+    try {
+      out.push(...(module.pendingFor?.({ ...base, config }) ?? []));
+    } catch {
+      // وحدة تعطّلت لا تمنع المتابعة من بقية الوحدات
+    }
+  }
+  return out;
+}
+
 /**
  * اتحاد أدوات الوحدات المفعّلة.
  * تضارب الأسماء بين وحدتين خطأ برمجي لا خطأ تشغيل، فنسجّله ونُبقي الأولى

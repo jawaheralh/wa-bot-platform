@@ -129,6 +129,7 @@ export const CORE_TABLES: string[] = [
     replies    INTEGER NOT NULL DEFAULT 0,    -- ردود البوت
     tool_calls INTEGER NOT NULL DEFAULT 0,
     failures   INTEGER NOT NULL DEFAULT 0,
+    followups  INTEGER NOT NULL DEFAULT 0,    -- متابعات قبل إغلاق النافذة
     -- توكنات الإدخال: المقروء من التخزين بعُشر السعر، والمكتوب بضعف وربع
     cache_read    INTEGER NOT NULL DEFAULT 0,
     cache_written INTEGER NOT NULL DEFAULT 0,
@@ -192,6 +193,8 @@ export const CORE_COLUMNS: [table: string, column: string, definition: string][]
   ['conversations', 'viewing_at', 'TEXT'],
   // وسم التجربة: هو وحده ما يجيز الحذف. محادثة بلا وسم لا تُحذف أبداً.
   ['conversations', 'is_test', 'INTEGER NOT NULL DEFAULT 0'],
+  // آخر متابعة أُرسلت — تُقارَن بآخر رسالة للعميل فلا تتكرر لنافذة واحدة.
+  ['conversations', 'followup_at', 'TEXT'],
   ['messages', 'user_id', 'INTEGER'],
   ['messages', 'media_path', 'TEXT'],
   ['messages', 'media_name', 'TEXT'],
@@ -205,6 +208,7 @@ export const CORE_COLUMNS: [table: string, column: string, definition: string][]
   ['tenants', 'wa_business_id', 'TEXT'],
   ['tenants', 'anthropic_api_key', 'TEXT'],
   ['tenants', 'anthropic_model', 'TEXT'],
+  ['usage_log', 'followups', 'INTEGER NOT NULL DEFAULT 0'],
   ['usage_log', 'cache_read', 'INTEGER NOT NULL DEFAULT 0'],
   ['usage_log', 'cache_written', 'INTEGER NOT NULL DEFAULT 0'],
   ['usage_log', 'uncached', 'INTEGER NOT NULL DEFAULT 0'],

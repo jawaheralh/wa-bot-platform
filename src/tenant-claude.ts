@@ -50,7 +50,7 @@ export function forgetClaudeCache(): void {
    الاستهلاك
 --------------------------------------------------------------- */
 
-export type UsageKind = 'replies' | 'tool_calls' | 'failures';
+export type UsageKind = 'replies' | 'tool_calls' | 'failures' | 'followups';
 
 export function recordUsage(db: Db, tenantId: number, kind: UsageKind, amount = 1): void {
   const month = today().slice(0, 7);

@@ -62,7 +62,7 @@ async function main(): Promise<void> {
 
   await provider.start();
 
-  const stopScheduler = startScheduler(app);
+  const stopScheduler = startScheduler(app, claude);
 
   const server = await createServer(app);
   await server.listen({ port: config.port, host: config.host });

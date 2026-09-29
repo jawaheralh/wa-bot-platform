@@ -13,10 +13,12 @@ import { runHealthCheck, alertIfChanged } from './health.ts';
 import { backupIfDue } from './backup.ts';
 import { watchTunnel } from './tunnel.ts';
 import { today } from './time.ts';
+import { runFollowups } from './followup.ts';
+import type { ClaudeClient } from './bot/claude.ts';
 
 const TICK_MS = 60_000;
 
-export function startScheduler(app: App): () => void {
+export function startScheduler(app: App, claude?: ClaudeClient): () => void {
   const deps = {
     db: app.db,
     config: app.config,
@@ -64,6 +66,18 @@ export function startScheduler(app: App): () => void {
 
       /* --- نسخة احتياطية يومية --- */
       if (day !== lastPurgeDay || !lastHealthCheck) backupIfDue(app);
+
+      /**
+       * متابعة من تُغلق نافذته.
+       *
+       * قبل مراقبة النفق: هذه تُرسل رسائل، وتلك قد تُعيد تشغيل النفق
+       * فتُؤخّر النبضة. والمتابعة محكومة بوقت لا يُعوَّض.
+       */
+      try {
+        await runFollowups(app, claude);
+      } catch (error) {
+        deps.logger.error('فشلت جولة المتابعات', error);
+      }
 
       /* --- مراقبة النفق كل نبضة: انقطاعه يوقف كل الرسائل --- */
       try {

@@ -100,6 +100,17 @@ export interface BotModule {
   tools(ctx: ModuleContext): ToolDefinition[];
   runTool(name: string, input: Record<string, unknown>, ctx: ModuleContext): Promise<ToolResult>;
 
+  /**
+   * ما زال معلّقاً لهذا العميل — سطر لكل بند.
+   *
+   * يُستعمل في المتابعة قبل انتهاء نافذة الأربع والعشرين ساعة: لا
+   * يُزعَج عميل انتهى أمره، ولا يُترك من ينتظر جواباً حتى يُغلق بابه.
+   *
+   * ووجوده في العقد بدل أن يقرأ المجدول جداول الوحدات مباشرةً هو ما
+   * يُبقي وحدةً جديدة قابلةً للإضافة بملف واحد.
+   */
+  pendingFor?(ctx: ModuleContext): string[];
+
   /** مسارات API إضافية لصفحة الأدمن، تُركَّب تحت /api/tenants/:tenantId/modules/<name>. */
   routes?(app: FastifyInstance, deps: ModuleDeps): void;
   /** مهمة دورية (تذكيرات المواعيد مثلاً) — تُنادى للمنشآت المفعِّلة فقط. */
