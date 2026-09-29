@@ -12,6 +12,9 @@ import {
   getConversation,
   recentMessages,
   saveMessage,
+  normalizeNumber,
+  toInternational,
+  getOrCreateConversation,
   silenceConversation,
   assignConversation,
   markViewing,
@@ -662,6 +665,74 @@ export function registerTenantRoutes(
       ip: request.ip,
     });
     return result;
+  });
+
+  /* ---------------------------------------------------------------
+     القوالب — مراسلة من لم يراسلنا، أو من انقضت نافذته
+  --------------------------------------------------------------- */
+
+  /** القوالب المعتمدة لهذه المنشأة، تُقرأ من Meta مباشرة. */
+  app.get('/api/tenants/:tenantId/templates', async (request) => {
+    const id = tenantOf(request);
+    if (!provider.listTemplates) {
+      throw Object.assign(new Error('المزوّد الحالي لا يدعم القوالب.'), { statusCode: 400 });
+    }
+    return { templates: await provider.listTemplates(id) };
+  });
+
+  /**
+   * إرسال بقالب — لمحادثة قائمة أو لرقم جديد.
+   *
+   * الرقم يُقبل مباشرة لأن هذا هو الغرض: مراسلة من لم يراسلنا. وتُنشأ
+   * له محادثة لتُحفظ الرسالة في مكانها بدل أن تضيع بلا أثر.
+   */
+  app.post('/api/tenants/:tenantId/templates/send', async (request) => {
+    const id = tenantOf(request);
+    if (!provider.sendTemplate) {
+      throw Object.assign(new Error('المزوّد الحالي لا يدعم القوالب.'), { statusCode: 400 });
+    }
+
+    const body = (request.body ?? {}) as {
+      to?: string;
+      name?: string;
+      language?: string;
+      variables?: unknown;
+    };
+
+    // الموظفة تكتب الرقم كما في دفترها؛ Meta تريده دولياً.
+    const to = toInternational(String(body.to ?? ''));
+    const name = String(body.name ?? '').trim();
+    if (!to) throw Object.assign(new Error('أدخلي رقم العميل.'), { statusCode: 400 });
+    if (!name) throw Object.assign(new Error('اختاري قالباً.'), { statusCode: 400 });
+
+    const variables = Array.isArray(body.variables) ? body.variables.map((v) => String(v ?? '').trim()) : [];
+    if (variables.some((v) => !v)) {
+      throw Object.assign(new Error('املئي كل متغيّرات القالب.'), { statusCode: 400 });
+    }
+
+    const sent = await provider.sendTemplate(id, to, {
+      name,
+      language: String(body.language ?? 'ar'),
+      variables,
+    });
+
+    // تُحفظ باسم الموظفة: رسالة خرجت باسم المنشأة يجب أن يُعرف مرسلها.
+    const conversation = getOrCreateConversation(db, id, to);
+    const text = variables.length ? `(قالب ${name}) ${variables.join(' · ')}` : `(قالب ${name})`;
+    saveMessage(db, conversation.id, 'staff', text, {
+      waMessageId: sent.id,
+      userId: request.user?.id ?? null,
+    });
+
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username ?? '',
+      action: 'manual_reply',
+      ip: request.ip,
+    });
+
+    return { ok: true, conversationId: conversation.id };
   });
 
   /* --- التنبيهات --- */

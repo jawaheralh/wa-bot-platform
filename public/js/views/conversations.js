@@ -164,6 +164,7 @@ async function openThread(conversationId, main, staff) {
       }</div>
 
       ${windowNotice(messages)}
+      <div id="templateBox"></div>
 
       <label for="reply">رد يدوي (يُسكت البوت تلقائياً ويُسجَّل باسمك)</label>
       <textarea id="reply" placeholder="اكتبي ردك للعميل…"></textarea>
@@ -234,6 +235,10 @@ async function openThread(conversationId, main, staff) {
     });
   }
 
+  // القوالب تظهر حين تُغلق النافذة — لا قبلها، فلا تُستعمل بلا داعٍ
+  // وهي أغلى من النص الحر ومقيّدة الصياغة.
+  if (windowClosed(messages)) void renderTemplates(document.getElementById('templateBox'), conversation, main, staff);
+
   document.getElementById('markTest').onclick = guard(async () => {
     const next = !conversation.is_test;
     await post(`/api/tenants/${state.tenantId}/conversations/${conversationId}/test`, { isTest: next });
@@ -290,13 +295,22 @@ function silenceNotice(conversation) {
  * قبل الكتابة يوفّر على الموظفة أن تكتب رداً طويلاً ثم يُرفض — وأن
  * تظنّ العطل في النظام.
  */
-function windowNotice(messages) {
+function windowLeft(messages) {
   const last = [...messages].reverse().find((m) => m.role === 'customer');
-  if (!last) return '';
-
+  if (!last) return null;
   const sent = new Date(`${last.created_at.replace(' ', 'T')}+03:00`).getTime();
-  const closesAt = sent + 24 * 3600_000;
-  const left = closesAt - Date.now();
+  return sent + 24 * 3600_000 - Date.now();
+}
+
+/** لا رسالة من العميل أصلاً = النافذة مغلقة، لا مفتوحة. */
+function windowClosed(messages) {
+  const left = windowLeft(messages);
+  return left === null || left <= 0;
+}
+
+function windowNotice(messages) {
+  const left = windowLeft(messages);
+  if (left === null) return '';
 
   if (left <= 0) {
     return `
@@ -320,4 +334,81 @@ function windowNotice(messages) {
       </div>`;
   }
   return '';
+}
+
+
+/* ---------------------------------------------------------------
+   الإرسال بقالب
+--------------------------------------------------------------- */
+
+/**
+ * يعرض القوالب المعتمدة ويملأ متغيّراتها.
+ *
+ * تُقرأ من Meta عند كل فتح لا من نسخة عندنا: الاعتماد والرفض يحدثان
+ * هناك، ونسخة محلية تتقادم فتُعرض قوالب رُفضت — تُرسَل فتفشل، ويبدو
+ * العطل عندنا.
+ */
+async function renderTemplates(box, conversation, main, staff) {
+  if (!box) return;
+  box.innerHTML = '<p class="muted">جارٍ قراءة القوالب من Meta…</p>';
+
+  let templates = [];
+  try {
+    ({ templates } = await get(`/api/tenants/${state.tenantId}/templates`));
+  } catch (error) {
+    box.innerHTML = `<p class="muted">تعذّرت قراءة القوالب: ${esc(error.message)}</p>`;
+    return;
+  }
+
+  if (templates.length === 0) {
+    box.innerHTML = `
+      <p class="muted">
+        لا قوالب معتمدة بعد. أنشئيها في
+        <strong>Meta ← WhatsApp Manager ← Message templates</strong>،
+        وبعد اعتمادها تظهر هنا.
+      </p>`;
+    return;
+  }
+
+  box.innerHTML = `
+    <label for="tpl">أرسلي بقالب معتمد</label>
+    <select id="tpl">
+      ${templates
+        .map((t, i) => `<option value="${i}">${esc(t.name)} · ${esc(t.language)}</option>`)
+        .join('')}
+    </select>
+    <p class="muted" id="tplBody" style="margin:6px 0"></p>
+    <div id="tplVars"></div>
+    <div class="actions"><button class="btn" id="tplSend">إرسال القالب</button></div>
+  `;
+
+  const select = box.querySelector('#tpl');
+  const bodyBox = box.querySelector('#tplBody');
+  const varsBox = box.querySelector('#tplVars');
+
+  const draw = () => {
+    const template = templates[Number(select.value)];
+    bodyBox.textContent = template.body || '(بلا متن)';
+    varsBox.innerHTML = Array.from({ length: template.variables }, (_, i) => `
+      <label for="v${i}">المتغيّر {{${i + 1}}}</label>
+      <input id="v${i}" data-var="${i}">
+    `).join('');
+  };
+  select.onchange = draw;
+  draw();
+
+  box.querySelector('#tplSend').onclick = guard(async () => {
+    const template = templates[Number(select.value)];
+    const variables = [...varsBox.querySelectorAll('[data-var]')].map((input) => input.value);
+
+    await post(`/api/tenants/${state.tenantId}/templates/send`, {
+      to: conversation.customer_wa,
+      name: template.name,
+      language: template.language,
+      variables,
+    });
+    flash('أُرسل القالب. ردّ العميل يفتح النافذة من جديد.');
+    await renderConversations(main);
+    await openThread(conversation.id, main, staff);
+  });
 }

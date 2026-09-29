@@ -71,6 +71,18 @@ export interface ProviderStatus {
 
 export type MessageHandler = (message: IncomingMessage) => Promise<void>;
 
+/** قالب معتمد كما تُعيده Meta. */
+export interface TemplateSummary {
+  name: string;
+  language: string;
+  status: string;
+  category: string;
+  /** نص المتن بمتغيّراته {{1}} — لتعرف الموظفة ما تملؤه. */
+  body: string;
+  /** عدد المتغيّرات المطلوبة. */
+  variables: number;
+}
+
 export interface WhatsAppProvider {
   readonly name: string;
   /** يبدأ الاتصال لكل المنشآت النشطة. */
@@ -80,6 +92,20 @@ export interface WhatsAppProvider {
   onMessage(handler: MessageHandler): void;
   /** إرسال نص. على المزوّد أن يُعيد المحاولة داخلياً قبل أن يرمي. */
   sendText(tenantId: number, to: string, text: string): Promise<SendResult>;
+  /**
+   * إرسال بقالب معتمد من Meta.
+   *
+   * السبيل الوحيد لمراسلة رقم لم يراسلك، أو مضى على رسالته أكثر من
+   * أربع وعشرين ساعة. المزوّدات التي لا تدعمه ترمي برسالة صريحة بدل
+   * أن تصمت — الصمت هنا يُفهَم نجاحاً.
+   */
+  sendTemplate?(
+    tenantId: number,
+    to: string,
+    template: { name: string; language: string; variables?: string[] },
+  ): Promise<SendResult>;
+  /** القوالب المعتمدة لدى Meta لهذه المنشأة. */
+  listTemplates?(tenantId: number): Promise<TemplateSummary[]>;
   status(tenantId: number): ProviderStatus;
   /** يُعلم المزوّد بأن منشأة أُضيفت أو عُدّلت فيفتح لها جلسة. */
   refreshTenant?(tenantId: number): Promise<void>;

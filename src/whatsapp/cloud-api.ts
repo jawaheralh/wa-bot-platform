@@ -12,7 +12,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { AppConfig } from '../config.ts';
-import { findTenantByPhoneNumberId, getTenant, normalizeNumber, type Db } from '../db/index.ts';
+import { findTenantByPhoneNumberId, getTenant, normalizeNumber, type Db, type TenantRow } from '../db/index.ts';
 import { credentialsFor, allAppSecrets } from '../tenant-meta.ts';
 import type { Logger } from '../logger.ts';
 import type {
@@ -22,6 +22,7 @@ import type {
   MessageHandler,
   ProviderStatus,
   SendResult,
+  TemplateSummary,
   WhatsAppProvider,
 } from './provider.ts';
 import { withRetry, markNoRetry } from './provider.ts';
@@ -197,6 +198,113 @@ export class CloudApiProvider implements WhatsAppProvider {
     );
 
     return { id: data.messages?.[0]?.id ?? '' };
+  }
+
+  /* ---------------------------------------------------------------
+     القوالب — السبيل الوحيد لبدء محادثة
+  --------------------------------------------------------------- */
+
+  /** بيانات المنشأة أو رسالة صريحة بما ينقص. */
+  private credentialsOrThrow(tenantId: number): { tenant: TenantRow; token: string } {
+    const tenant = getTenant(this.db, tenantId);
+    if (!tenant?.wa_phone_number_id) {
+      throw new Error(`المنشأة ${tenantId} بلا معرّف رقم — أدخليه في إعدادات المنشأة.`);
+    }
+    const credentials = credentialsFor(this.config, tenant);
+    if (!credentials.accessToken) {
+      throw new Error(`المنشأة «${tenant.name}» بلا توكن Meta — أدخليه في إعدادات المنشأة.`);
+    }
+    return { tenant, token: credentials.accessToken };
+  }
+
+  async sendTemplate(
+    tenantId: number,
+    to: string,
+    template: { name: string; language: string; variables?: string[] },
+  ): Promise<SendResult> {
+    const { tenant, token } = this.credentialsOrThrow(tenantId);
+    const url = `https://graph.facebook.com/${this.config.cloud.graphVersion}/${tenant.wa_phone_number_id}/messages`;
+
+    const variables = template.variables ?? [];
+    const components = variables.length
+      ? [{ type: 'body', parameters: variables.map((text) => ({ type: 'text', text })) }]
+      : [];
+
+    const data = await withRetry(
+      async () => {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: normalizeNumber(to),
+            type: 'template',
+            template: {
+              name: template.name,
+              language: { code: template.language },
+              ...(components.length ? { components } : {}),
+            },
+          }),
+        });
+
+        const body = await response.text();
+        if (!response.ok) {
+          const retryable = response.status === 429 || response.status >= 500;
+          const error = new Error(explainSendFailure(response.status, body));
+          throw retryable ? error : markNoRetry(error);
+        }
+        return JSON.parse(body) as { messages?: { id?: string }[] };
+      },
+      { attempts: 3, baseDelayMs: 700 },
+    );
+
+    return { id: data.messages?.[0]?.id ?? '' };
+  }
+
+  /**
+   * القوالب المعتمدة لهذه المنشأة.
+   *
+   * تُقرأ من Meta لا من عندنا: الاعتماد والرفض يحدثان هناك، ونسخة
+   * محلية تتقادم فتُعرض للموظفة قوالب رُفضت — فتُرسل فتفشل.
+   */
+  async listTemplates(tenantId: number): Promise<TemplateSummary[]> {
+    const tenant = getTenant(this.db, tenantId);
+    if (!tenant) throw new Error('المنشأة غير موجودة.');
+
+    const credentials = credentialsFor(this.config, tenant);
+    if (!credentials.accessToken || !credentials.businessId) {
+      throw new Error('يلزم توكن المنشأة ومعرّف نشاطها التجاري لقراءة القوالب.');
+    }
+
+    const url =
+      `https://graph.facebook.com/${this.config.cloud.graphVersion}/${credentials.businessId}` +
+      `/message_templates?limit=100&access_token=${encodeURIComponent(credentials.accessToken)}`;
+
+    const response = await fetch(url);
+    const body = await response.text();
+    if (!response.ok) throw new Error(explainSendFailure(response.status, body));
+
+    const parsed = JSON.parse(body) as {
+      data?: { name?: string; language?: string; status?: string; category?: string; components?: { type?: string; text?: string }[] }[];
+    };
+
+    return (parsed.data ?? [])
+      // المرفوض والمعلّق لا يُرسل، وعرضه يوهم بأنه جاهز.
+      .filter((t) => (t.status ?? '').toUpperCase() === 'APPROVED')
+      .map((t) => {
+        const bodyText = t.components?.find((c) => (c.type ?? '').toUpperCase() === 'BODY')?.text ?? '';
+        const variables = new Set([...bodyText.matchAll(/\{\{(\d+)\}\}/g)].map((m) => m[1]));
+        return {
+          name: t.name ?? '',
+          language: t.language ?? 'ar',
+          status: t.status ?? '',
+          category: t.category ?? '',
+          body: bodyText,
+          variables: variables.size,
+        };
+      })
+      .filter((t) => t.name);
   }
 
   /* ---------------------------------------------------------------

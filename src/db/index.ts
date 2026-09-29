@@ -149,6 +149,26 @@ export function normalizeNumber(raw: string): string {
   return (raw ?? '').replace(/\D/g, '').replace(/^00/, '');
 }
 
+/**
+ * رقم يكتبه إنسان ← الصيغة الدولية التي تفهمها Meta.
+ *
+ * الوارد من واتساب يأتي دولياً دائماً، أما ما تكتبه الموظفة فبالصيغة
+ * المحلية «٠٥٥١٢٣٤٥٦٧» كما في دفتر هاتفها. وإرساله هكذا يُرفض أو
+ * يُوجَّه لرقم آخر في بلد آخر — ولا يظهر الخطأ إلا حين لا يصل شيء.
+ *
+ * ولا يُمَسّ ما كان دولياً أصلاً: الرقم الذي يبدأ برمز دولة يُترك.
+ */
+export function toInternational(raw: string, countryCode = '966'): string {
+  const digits = normalizeNumber(raw);
+  if (!digits) return '';
+  if (digits.startsWith(countryCode)) return digits;
+  // ٠٥٥١٢٣٤٥٦٧ → ٩٦٦٥٥١٢٣٤٥٦٧
+  if (digits.startsWith('0')) return countryCode + digits.slice(1);
+  // ٥٥١٢٣٤٥٦٧ بلا صفر ولا رمز
+  if (digits.length === 9 && digits.startsWith('5')) return countryCode + digits;
+  return digits;
+}
+
 export function findTenantByNumber(db: Db, waNumber: string): TenantRow | undefined {
   return db
     .prepare(`SELECT * FROM tenants WHERE wa_number = ? AND status = 'active'`)

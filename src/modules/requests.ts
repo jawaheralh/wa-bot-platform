@@ -205,11 +205,34 @@ export async function notifyRequestCustomer(
     db.prepare(`UPDATE requests SET notified_status = ? WHERE id = ?`).run(row.status, row.id);
     return { sent: true };
   } catch (error) {
+    const reason = (error as Error).message;
     deps.logger.error('تعذّر إبلاغ العميل بتحديث طلبه', error, {
       tenant: row.tenant_id,
       مرجع: row.reference,
     });
-    return { sent: false, reason: (error as Error).message };
+
+    /**
+     * الفشل يُبلَّغ به موظف، لا يُكتب في سجل لا يقرؤه أحد.
+     *
+     * أشهر أسبابه انقضاء نافذة الأربع والعشرين ساعة: الطلب أُنجز
+     * والعميل ينتظر، ولا سبيل لإبلاغه إلا باتصال أو قالب معتمد.
+     * وبلا تنبيه يبقى منتظراً وتظنّ المنشأة أنه أُبلغ.
+     */
+    await deps.notify(
+      row.tenant_id,
+      'handoff',
+      `تعذّر إبلاغ العميل بتحديث الطلب ${row.reference}`,
+      [
+        `العميل: ${row.customer_wa}`,
+        `الحالة الجديدة: ${STATUS_AR[row.status]}`,
+        `السبب: ${reason}`,
+        '',
+        'أبلغيه باتصال، أو بقالب معتمد من شاشة المحادثة.',
+      ].join('\n'),
+      row.conversation_id ?? undefined,
+    );
+
+    return { sent: false, reason };
   }
 }
 
