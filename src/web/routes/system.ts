@@ -280,6 +280,113 @@ export function registerSystemRoutes(
   });
 
   /** يضبط الـwebhook ويشترك حساب واتساب — بديل واجهة Meta. */
+  /**
+   * إعداد منشأة بعينها — حالتها هي لا حالة النظام.
+   *
+   * كانت شاشة الإعداد تعرض بيانات النظام العام أياً كانت المنشأة
+   * المفتوحة، فيفتح أدمن النظام «مطعم الركن» ويرى توكن «وقودي» —
+   * ويظنّ أن المطعم مضبوط وهو لم يُربط بعد.
+   *
+   * كل فحص هنا يجري ببيانات هذه المنشأة وحدها.
+   */
+  app.get('/api/system/tenants/:id/setup', async (request) => {
+    requireSystemAdmin(request);
+    const id = Number((request.params as { id: string }).id);
+    const tenant = getTenant(db, id);
+    if (!tenant) throw Object.assign(new Error('المنشأة غير موجودة.'), { statusCode: 404 });
+
+    const meta = await import('../../meta-setup.ts');
+    const { credentialsFor } = await import('../../tenant-meta.ts');
+    const credentials = credentialsFor(config, tenant);
+
+    const mask = (value: string | null): string => (value ? `${value.slice(0, 6)}…${value.slice(-4)}` : '');
+
+    const checks: { key: string; label: string; ok: boolean; message: string }[] = [];
+
+    if (!credentials.accessToken || !credentials.appSecret) {
+      checks.push({
+        key: 'credentials',
+        label: 'بيانات Meta',
+        ok: false,
+        message: 'لم تُدخَل بعد — هذه المنشأة لا ترسل ولا تستقبل شيئاً.',
+      });
+    } else {
+      const [token, secret] = await Promise.all([
+        meta.checkTokenFor(config, credentials),
+        meta.checkAppSecretFor(config, credentials),
+      ]);
+      checks.push({ key: 'token', label: 'توكن Meta', ok: token.ok, message: token.message });
+      checks.push({ key: 'secret', label: 'المفتاح السري', ok: secret.ok, message: secret.message });
+
+      if (tenant.wa_phone_number_id) {
+        const number = await meta.checkPhoneNumberFor(config, credentials, tenant.wa_phone_number_id);
+        checks.push({ key: 'number', label: 'الرقم لدى Meta', ok: number.ok, message: number.message });
+      } else {
+        checks.push({
+          key: 'number',
+          label: 'الرقم لدى Meta',
+          ok: false,
+          message: 'لا يوجد معرّف رقم (Phone number ID).',
+        });
+      }
+    }
+
+    checks.push({
+      key: 'claude',
+      label: 'مفتاح Claude',
+      ok: Boolean(tenant.anthropic_api_key || config.anthropicApiKey),
+      message: tenant.anthropic_api_key
+        ? 'مفتاح خاص بهذه المنشأة — مصروفها منفصل.'
+        : config.anthropicApiKey
+          ? 'تستعمل المفتاح العام — مصروفها على حسابك أنتِ.'
+          : 'لا يوجد مفتاح — البوت لن يرد.',
+    });
+
+    return {
+      tenant: {
+        id: tenant.id,
+        name: tenant.name,
+        waNumber: tenant.wa_number,
+        waPhoneNumberId: tenant.wa_phone_number_id ?? '',
+        waAppId: tenant.wa_app_id ?? '',
+        waBusinessId: tenant.wa_business_id ?? '',
+        tone: tenant.tone,
+        staffWaNumber: tenant.staff_wa_number ?? '',
+        status: tenant.status,
+      },
+      secrets: {
+        waAccessToken: mask(tenant.wa_access_token),
+        waAppSecret: mask(tenant.wa_app_secret),
+        anthropicApiKey: mask(tenant.anthropic_api_key),
+      },
+      own: credentials.own,
+      ownClaude: Boolean(tenant.anthropic_api_key),
+      publicUrl: config.publicUrl,
+      webhookUrl: config.publicUrl ? `${config.publicUrl}/webhook/whatsapp` : '',
+      checks,
+    };
+  });
+
+  /** يسجّل الـwebhook لتطبيق هذه المنشأة وحدها. */
+  app.post('/api/system/tenants/:id/configure-webhook', async (request) => {
+    requireSystemAdmin(request);
+    const id = Number((request.params as { id: string }).id);
+    const tenant = getTenant(db, id);
+    if (!tenant) throw Object.assign(new Error('المنشأة غير موجودة.'), { statusCode: 404 });
+
+    const meta = await import('../../meta-setup.ts');
+    const { credentialsFor } = await import('../../tenant-meta.ts');
+    const credentials = credentialsFor(config, tenant);
+
+    if (!credentials.appId || !credentials.appSecret) {
+      throw Object.assign(
+        new Error('أدخلي توكن المنشأة ومفتاحها السري ومعرّف تطبيقها أولاً.'),
+        { statusCode: 400 },
+      );
+    }
+    return meta.configureWebhook({ ...config, cloud: { ...config.cloud, ...credentials } });
+  });
+
   app.post('/api/system/meta/configure-webhook', async (request) => {
     requireSystemAdmin(request);
     const meta = await import('../../meta-setup.ts');

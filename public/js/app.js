@@ -19,6 +19,7 @@ import { renderRequests } from './views/requests.js';
 import { renderPrivacy } from './views/privacy.js';
 import { renderBookings } from './views/bookings.js';
 import { renderAccount } from './views/account.js';
+import { renderTenantSetup } from './views/tenant-setup.js';
 
 const VIEWS = [
   { id: 'overview', label: 'نظرة عامة', render: renderOverview },
@@ -170,8 +171,16 @@ async function draw(main) {
       return;
     }
 
+    /**
+     * «الإعداد» يتبع المنشأة المفتوحة.
+     *
+     * كان يعرض إعدادات النظام العام دائماً، فتُفتح منشأة ويُرى توكن
+     * منشأة أخرى. مع اختيار منشأة يعرض إعدادها هي، وبلا اختيار يعرض
+     * المشترك — وهذا ما يتوقّعه من فتح شركة ليضبطها.
+     */
     if (state.view === 'setup') {
-      await renderSetup(main);
+      if (state.tenantId) await renderTenantSetup(main);
+      else await renderSetup(main);
       return;
     }
 
