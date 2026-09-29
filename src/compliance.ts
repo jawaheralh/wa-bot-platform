@@ -52,6 +52,7 @@ export const ACTION_AR: Record<string, string> = {
   kb_change: 'تعديل قاعدة المعرفة',
   module_config: 'تعديل إعدادات وحدة',
   staff_change: 'تعديل موظف',
+  password_changed: 'تغيير كلمة المرور',
   delete_customer: 'حذف بيانات عميل',
   retention_purge: 'حذف تلقائي بانتهاء مدة الاحتفاظ',
   export_customer: 'تصدير بيانات عميل',

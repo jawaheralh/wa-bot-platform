@@ -18,6 +18,7 @@ import { renderStaff } from './views/staff.js';
 import { renderRequests } from './views/requests.js';
 import { renderPrivacy } from './views/privacy.js';
 import { renderBookings } from './views/bookings.js';
+import { renderAccount } from './views/account.js';
 
 const VIEWS = [
   { id: 'overview', label: 'نظرة عامة', render: renderOverview },
@@ -73,7 +74,7 @@ function visibleViews() {
  * شاشات أدمن النظام: ليست في VIEWS لأنها لا تخص منشأة بعينها.
  * إغفالها هنا جعل الحارس أدناه يُعيدها إلى «نظرة عامة» عند كل ضغطة.
  */
-const SYSTEM_VIEWS = new Set(['setup', 'tenants']);
+const SYSTEM_VIEWS = new Set(['setup', 'tenants', 'account']);
 
 function render() {
   const views = visibleViews();
@@ -124,7 +125,10 @@ function render() {
         </nav>
 
         <div class="spacer"></div>
-        <nav><button id="logout">تسجيل الخروج</button></nav>
+        <nav>
+          <button data-view="account" class="${state.view === 'account' ? 'active' : ''}">حسابي</button>
+          <button id="logout">تسجيل الخروج</button>
+        </nav>
       </aside>
       <main><div class="empty">جارٍ التحميل…</div></main>
     </div>
@@ -159,6 +163,13 @@ function render() {
 
 async function draw(main) {
   try {
+    // قبل حارس «اختاري منشأة»: حسابي لا يخصّ منشأة، وأدمن النظام
+    // يدخلها وهو لم يختر أي منشأة بعد.
+    if (state.view === 'account') {
+      await renderAccount(main);
+      return;
+    }
+
     if (state.view === 'setup') {
       await renderSetup(main);
       return;

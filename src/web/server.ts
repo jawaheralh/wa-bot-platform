@@ -28,6 +28,7 @@ import { MODULES } from '../modules/registry.ts';
 import { unwrapProvider } from '../whatsapp/provider.ts';
 import { errorMessage } from '../logger.ts';
 import { audit } from '../compliance.ts';
+import { hashPassword } from '../tenants.ts';
 
 export async function createServer(app: App): Promise<FastifyInstance> {
   const { db, config, logger, provider, notify } = app;
@@ -162,6 +163,59 @@ export async function createServer(app: App): Promise<FastifyInstance> {
     const user = readSession(db, request);
     if (!user) throw Object.assign(new Error('يلزم تسجيل الدخول.'), { statusCode: 401 });
     return user;
+  });
+
+  /**
+   * تغيير كلمة مروري أنا.
+   *
+   * شاشة الفريق تغيّر كلمة الموظف لا كلمة صاحبها، وأدمن النظام ليس
+   * موظفاً في أي منشأة فلا تطاله أصلاً — فكان من سلّمناه كلمة مؤقتة
+   * محكوماً بها إلى الأبد. وتغيير المالك لكلمة موظفه لا يُغني: من حقّ
+   * كلٍّ أن تكون كلمته لا يعرفها سواه.
+   *
+   * الكلمة الحالية مطلوبة: جهاز مفتوح بلا صاحبه يكفي لاختطاف الحساب.
+   */
+  server.post('/api/me/password', async (request, reply) => {
+    const session = readSession(db, request);
+    if (!session) throw Object.assign(new Error('يلزم تسجيل الدخول.'), { statusCode: 401 });
+
+    const body = (request.body ?? {}) as { current?: string; next?: string };
+    const current = String(body.current ?? '');
+    const next = String(body.next ?? '');
+
+    if (next.length < 10) {
+      throw Object.assign(new Error('كلمة المرور يجب ألّا تقل عن ١٠ أحرف.'), { statusCode: 400 });
+    }
+    if (next === current) {
+      throw Object.assign(new Error('الكلمة الجديدة مطابقة للحالية.'), { statusCode: 400 });
+    }
+
+    // حدّ المحاولات نفسه: وإلا صار هذا المسار باباً خلفياً لتخمين الكلمة.
+    const key = `pw:${request.ip}`;
+    checkLoginRate(key);
+    try {
+      login(db, session.username, current);
+    } catch {
+      recordLoginFailure(key);
+      logger.warn('محاولة تغيير كلمة مرور بكلمة حالية خاطئة', { مستخدم: session.username, مصدر: request.ip });
+      throw Object.assign(new Error('كلمة المرور الحالية غير صحيحة.'), { statusCode: 401 });
+    }
+    clearLoginFailures(key);
+
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(next), session.id);
+    logger.info('غُيّرت كلمة المرور', { مستخدم: session.username });
+    audit(db, {
+      tenantId: session.tenantId,
+      userId: session.id,
+      username: session.username,
+      action: 'password_changed',
+      ip: request.ip,
+    });
+
+    // الجلسة القائمة تسقط: تغيير الكلمة يعني عادةً شكاً في تسرّبها،
+    // فالدخول من جديد يثبت أن صاحبها هو من بيده الكلمة الجديدة.
+    clearSession(reply);
+    return { ok: true };
   });
 
   registerSystemRoutes(server, db, provider, config);
