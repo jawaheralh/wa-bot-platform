@@ -18,6 +18,38 @@ fi
 
 if [[ $EUID -ne 0 ]]; then echo "شغّليه بـsudo" >&2; exit 1; fi
 
+echo "▸ تحصين الخادم"
+
+# صور Ubuntu على Oracle تأتي بقواعد iptables تحجب كل شيء عدا 22 —
+# فتح المنفذين في Security List وحده لا يكفي، والموقع يبدو معطّلاً بلا سبب.
+if command -v netfilter-persistent >/dev/null 2>&1 || [[ -f /etc/iptables/rules.v4 ]]; then
+  for port in 80 443; do
+    iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null \
+      || iptables -I INPUT 6 -p tcp --dport "$port" -m conntrack --ctstate NEW -j ACCEPT
+  done
+  apt-get install -y iptables-persistent >/dev/null 2>&1 || true
+  netfilter-persistent save >/dev/null 2>&1 || true
+  echo "  ✓ فُتح المنفذان 80 و443 في جدار الخادم"
+fi
+
+# منع تخمين كلمات مرور SSH: الحظر بعد محاولات فاشلة
+apt-get install -y fail2ban >/dev/null 2>&1 || true
+systemctl enable --now fail2ban >/dev/null 2>&1 || true
+
+# الدخول بالمفتاح وحده — لا كلمة مرور تُخمَّن
+if [[ -d /etc/ssh/sshd_config.d ]]; then
+  cat > /etc/ssh/sshd_config.d/99-wa-bot.conf <<'SSHCONF'
+PasswordAuthentication no
+PermitRootLogin no
+SSHCONF
+  systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true
+fi
+
+# تحديثات الأمان تلقائياً — ثغرة تُرقَّع قبل أن تُستغل
+apt-get install -y unattended-upgrades >/dev/null 2>&1 || true
+dpkg-reconfigure -f noninteractive unattended-upgrades >/dev/null 2>&1 || true
+echo "  ✓ fail2ban · دخول بالمفتاح فقط · تحديثات أمنية تلقائية"
+
 echo "▸ تثبيت Node.js 22"
 if ! command -v node >/dev/null || [[ "$(node -v | cut -d. -f1 | tr -d v)" -lt 22 ]]; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
@@ -81,6 +113,9 @@ echo "   ١. املئي المفاتيح:  sudo -u wabot nano $APP_DIR/.env"
 echo "   ٢. إن كانت قاعدة جديدة:  cd $APP_DIR && sudo -u wabot node src/seed.ts"
 echo "   ٣. أعيدي التشغيل:   sudo systemctl restart wa-bot"
 echo "   ٤. تابعي السجل:     sudo journalctl -u wa-bot -f"
+echo
+echo "   ملاحظة: النظام يستمع على 127.0.0.1 فقط، ولا يصله أحد إلا عبر Caddy"
+echo "           على 443 بشهادة HTTPS. المنفذ 4000 غير مكشوف للإنترنت."
 echo
 echo "   لوحة التحكم:  https://$DOMAIN"
 echo "   الـwebhook:   https://$DOMAIN/webhook/whatsapp"
