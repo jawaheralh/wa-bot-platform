@@ -13,7 +13,7 @@ export async function renderOverview(main) {
   main.innerHTML = `
     ${
       readOnly
-        ? `<div class="error" style="background:#fdf3e2;color:#b7791f;border:1px solid #f0d9a8">
+        ? `<div class="error" style="background:var(--accent-soft);color:var(--accent-dark);border:1px solid #e8d6c4">
              👁 <strong>وضع «عرض فقط»</strong> — تُستقبل رسائل العملاء وتُحفظ وتظهر هنا،
              ولا يُرسل النظام أي رد أو تنبيه إطلاقاً. لتفعيل الرد أزيلي
              <span class="mono">READ_ONLY</span> من ملف <span class="mono">.env</span>.

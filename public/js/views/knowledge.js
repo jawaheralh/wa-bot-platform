@@ -144,7 +144,7 @@ export function wireOnboarding(main, reload) {
       const result = await post(`/api/tenants/${state.tenantId}/onboarding/import`, { file: base64 });
 
       box.innerHTML = `
-        <div class="warn-box" style="background:#eef7f0;border-color:#cfe6d6">
+        <div class="warn-box" style="background:#e6f3ea;border-color:#c3e2cd">
           ✅ أُضيف <strong>${result.added}</strong> مدخلاً.
           ${result.skipped ? `تُخطّي ${result.skipped} صفاً (فارغ أو مكرر أو مثال).` : ''}
           ${result.notes?.length ? `<p class="muted" style="margin:6px 0 0">${result.notes.map(esc).join('<br>')}</p>` : ''}

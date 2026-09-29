@@ -160,7 +160,7 @@ export async function renderSetup(main) {
       <h3>يلزم إعادة تشغيل</h3>
       <p class="muted">حُفظت القيم، ولا تسري إلا بإعادة تشغيل الخادم.</p>
       <p>في نافذة Terminal: <strong>Control + C</strong> ثم</p>
-      <pre class="mono" style="background:#f4f6f8;padding:10px;border-radius:8px;direction:ltr">npm start</pre>
+      <pre class="mono" style="background:var(--bg);padding:10px;border-radius:8px;direction:ltr">npm start</pre>
     </div>
   `;
 

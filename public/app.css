@@ -1,22 +1,28 @@
 /* ===============================================================
    نظام التصميم
-   ألوان واتساب الخضراء مع رمادي هادئ — الواجهة أداة عمل يومية
-   لموظف، لا صفحة تسويق.
+   نفس هوية صفحة الهبوط: البنّي العميق والبرتقالي وخط IBM Plex Sans
+   Arabic. الموظف الذي يرى الصفحة الرئيسية ثم يدخل اللوحة يجب أن يشعر
+   أنه في نفس المنتج لا في نظامين اشتُريا من جهتين.
+
+   والفارق مقصود في المساحات لا في الألوان: الهبوط يتنفّس لأنه يُقرأ
+   مرة، واللوحة كثيفة لأنها تُفتح كل يوم وكل صف فيها عمل.
    =============================================================== */
 
 :root {
-  --green: #128c7e;
-  --green-dark: #075e54;
-  --green-light: #dcf8c6;
-  --ink: #1f2933;
-  --muted: #6b7684;
-  --line: #e3e7ec;
-  --bg: #f4f6f8;
+  --deep: #3b2229;
+  --deep-soft: #4a2c34;
+  --accent: #c9772b;
+  --accent-dark: #a95f1d;
+  --accent-soft: #f7efe8;
+  --ink: #2c1b20;
+  --muted: #6f625e;
+  --line: #e6dcd8;
+  --bg: #f8f3f0;
   --card: #ffffff;
-  --danger: #c0392b;
-  --warn: #b7791f;
-  --radius: 10px;
-  --shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
+  --danger: #a02c1c;
+  --warn: #a9702a;
+  --radius: 12px;
+  --shadow: 0 1px 3px rgba(59, 34, 41, 0.08);
   --sidebar-w: 240px;
 }
 
@@ -24,7 +30,9 @@
 
 body {
   margin: 0;
-  font-family: "SF Arabic", "Geeza Pro", "Segoe UI", "Noto Sans Arabic", Tahoma, sans-serif;
+  /* الخط من الشبكة، والبديل المحلي كامل: لو تعذّر التحميل تُقرأ اللوحة فوراً */
+  font-family: "IBM Plex Sans Arabic", "SF Arabic", "Geeza Pro", "Segoe UI",
+    "Noto Sans Arabic", Tahoma, sans-serif;
   direction: rtl;
   background: var(--bg);
   color: var(--ink);
@@ -40,7 +48,7 @@ body {
   display: inline-block;
 }
 
-a { color: var(--green); }
+a { color: var(--accent-dark); }
 button { font-family: inherit; font-size: inherit; }
 
 /* --- التخطيط --- */
@@ -49,30 +57,32 @@ button { font-family: inherit; font-size: inherit; }
 .sidebar {
   width: var(--sidebar-w);
   flex: 0 0 var(--sidebar-w);
-  background: var(--green-dark);
+  background: var(--deep);
   color: #fff;
   padding: 18px 14px;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-.sidebar h1 { font-size: 17px; margin: 0 0 4px; }
-.sidebar .who { font-size: 13px; opacity: 0.75; margin-bottom: 16px; }
+/* نفس علامة الصفحة الرئيسية — تعريف الهوية بلا صورة تُحمَّل */
+.sidebar h1 { font-size: 17px; margin: 0 0 4px; font-weight: 600; }
+.sidebar h1::before { content: '💬 '; }
+.sidebar .who { font-size: 13px; opacity: 0.72; margin-bottom: 16px; }
 .sidebar nav { display: flex; flex-direction: column; gap: 2px; }
 .sidebar nav button {
   background: transparent; border: 0; color: #fff; text-align: right;
-  padding: 9px 12px; border-radius: 8px; cursor: pointer; opacity: 0.85;
+  padding: 9px 12px; border-radius: 999px; cursor: pointer; opacity: 0.82;
 }
 .sidebar nav button:hover { background: rgba(255, 255, 255, 0.12); opacity: 1; }
-.sidebar nav button.active { background: var(--green); opacity: 1; font-weight: 600; }
+.sidebar nav button.active { background: var(--accent); opacity: 1; font-weight: 600; }
 .sidebar .spacer { flex: 1; }
 .sidebar select {
   width: 100%; padding: 8px; border-radius: 8px; border: 0;
-  font-family: inherit; margin-bottom: 14px;
+  font-family: inherit; margin-bottom: 14px; color: var(--ink);
 }
 
 main { flex: 1; padding: 22px 26px; min-width: 0; }
-h2 { margin: 0 0 4px; font-size: 21px; }
+h2 { margin: 0 0 4px; font-size: 21px; font-weight: 700; }
 .subtitle { color: var(--muted); margin: 0 0 18px; font-size: 14px; }
 
 /* --- البطاقات --- */
@@ -87,25 +97,26 @@ h2 { margin: 0 0 4px; font-size: 21px; }
 .kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin-bottom: 18px; }
 .kpi { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
 .kpi-label { color: var(--muted); font-size: 13px; }
-.kpi-value { font-size: 26px; font-weight: 700; color: var(--green-dark); }
+.kpi-value { font-size: 26px; font-weight: 700; color: var(--deep); }
 
 /* --- الجداول --- */
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { color: var(--muted); font-weight: 600; font-size: 13px; }
-tbody tr:hover { background: #fafbfc; }
+tbody tr:hover { background: #fdfaf8; }
 .table-wrap { overflow-x: auto; }
 
 /* --- الأزرار --- */
+/* كبسولة كأزرار الصفحة الرئيسية، بحشو أضيق يناسب الكثافة */
 .btn {
-  background: var(--green); color: #fff; border: 0; border-radius: 8px;
-  padding: 8px 14px; cursor: pointer;
+  background: var(--accent); color: #fff; border: 0; border-radius: 999px;
+  padding: 8px 16px; cursor: pointer; font-weight: 600;
 }
-.btn:hover { background: var(--green-dark); }
-.btn.ghost { background: transparent; color: var(--green); border: 1px solid var(--line); }
-.btn.ghost:hover { background: #f0f4f4; }
+.btn:hover { background: var(--accent-dark); }
+.btn.ghost { background: transparent; color: var(--accent-dark); border: 1px solid var(--line); }
+.btn.ghost:hover { background: var(--accent-soft); }
 .btn.danger { background: var(--danger); }
-.btn.small { padding: 4px 10px; font-size: 13px; }
+.btn.small { padding: 4px 12px; font-size: 13px; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* --- الحقول --- */
@@ -115,7 +126,7 @@ input, select, textarea {
   border-radius: 8px; font-family: inherit; font-size: 15px; background: #fff; color: var(--ink);
 }
 textarea { min-height: 90px; resize: vertical; line-height: 1.7; }
-input:focus, select:focus, textarea:focus { outline: 2px solid var(--green); outline-offset: -1px; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
 .row > * { flex: 1; min-width: 180px; }
 .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
@@ -123,36 +134,39 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--green); out
 /* --- الشارات --- */
 .badge {
   display: inline-block; padding: 2px 9px; border-radius: 999px;
-  font-size: 12px; background: #eef1f4; color: var(--muted); white-space: nowrap;
+  font-size: 12px; background: #f1eae6; color: var(--muted); white-space: nowrap;
 }
-.badge.green { background: #e4f5ec; color: #1e7a4c; }
+.badge.green { background: #e6f3ea; color: #1e7a4c; }
 .badge.red { background: #fdecea; color: var(--danger); }
-.badge.amber { background: #fdf3e2; color: var(--warn); }
-.badge.grey { background: #eef1f4; color: var(--muted); }
+.badge.amber { background: var(--accent-soft); color: var(--accent-dark); }
+.badge.grey { background: #f1eae6; color: var(--muted); }
 
 /* --- الوحدات --- */
 .module { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; background: var(--card); }
 .module h4 { margin: 0 0 4px; font-size: 16px; }
 .module p { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
-.module.off { background: #f7f8f9; border-style: dashed; }
-.module.off h4, .module.off p { color: #9aa3ad; }
+.module.off { background: #faf6f4; border-style: dashed; }
+.module.off h4, .module.off p { color: #a89c98; }
 .module .locked {
   background: #fff; border: 1px dashed var(--line); border-radius: 8px;
   padding: 10px; font-size: 13px; color: var(--muted); margin-top: 8px;
 }
 
 /* --- المحادثة --- */
+/* نفس فقاعات النموذج المصغّر في الصفحة الرئيسية: الوارد فاتح والصادر عميق */
 .chat { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; padding: 6px; }
-.bubble { max-width: 74%; padding: 8px 12px; border-radius: 12px; white-space: pre-wrap; word-break: break-word; }
+.bubble { max-width: 74%; padding: 8px 12px; border-radius: 14px; white-space: pre-wrap; word-break: break-word; }
 .bubble .meta { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; direction: ltr; text-align: left; }
-.bubble.customer { align-self: flex-start; background: #fff; border: 1px solid var(--line); }
-.bubble.bot { align-self: flex-end; background: var(--green-light); }
-.bubble.staff { align-self: flex-end; background: #fff3cd; }
+.bubble.customer { align-self: flex-start; background: #f3edea; border-start-start-radius: 4px; }
+.bubble.bot { align-self: flex-end; background: var(--deep); color: #fff; border-start-end-radius: 4px; }
+/* الموظف بلون ثالث: التمييز بين رد البوت ورد الإنسان أهم من الجمال */
+.bubble.bot .meta { color: rgba(255, 255, 255, 0.7); }
+.bubble.staff { align-self: flex-end; background: var(--accent-soft); border: 1px solid #e8d6c4; border-start-end-radius: 4px; }
 
 /* --- متفرقات --- */
 .empty { color: var(--muted); text-align: center; padding: 30px; }
-.error { background: #fdecea; color: var(--danger); padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
-.ok { background: #e4f5ec; color: #1e7a4c; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
+.error { background: #fdecea; border: 1px solid #f3c3bc; color: var(--danger); padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; }
+.ok { background: #e6f3ea; border: 1px solid #c3e2cd; color: #1e7a4c; padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; }
 .qr { font-family: ui-monospace, Menlo, monospace; font-size: 8px; line-height: 8px; white-space: pre; direction: ltr; }
 .muted { color: var(--muted); font-size: 13px; }
 
@@ -170,8 +184,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--green); out
   font-size: 15px;
   letter-spacing: 1px;
   line-height: 1.9;
-  background: var(--bg-soft, #f4f6f8);
-  border: 1px solid var(--line, #dde3e8);
+  background: var(--bg);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px 14px;
   margin: 10px 0;
@@ -182,14 +196,14 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--green); out
 .steps { margin: 0 0 14px; padding-inline-start: 20px; line-height: 2 }
 .steps li { margin-bottom: 6px }
 
-.btn.ghost { background: transparent; color: var(--ink, #223); border: 1px solid var(--line, #dde3e8) }
-.btn.danger { background: var(--danger, #c2410c) }
-
 /* تنبيه داخل بطاقة — أهدأ من .error وأوضح من .muted */
 .warn-box {
-  background: #fdf7ea;
-  border: 1px solid #f0dcb4;
-  border-radius: 8px;
+  background: #fdf5ea;
+  border: 1px solid #efdcbe;
+  border-radius: 10px;
   padding: 12px 14px;
   margin: 10px 0;
 }
+
+/* --- الوصول --- */
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px }

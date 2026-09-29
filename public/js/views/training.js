@@ -53,7 +53,7 @@ export async function renderTraining(main) {
           </p>
           ${
             g.similar?.length
-              ? `<p class="muted" style="background:#f4f6f8;padding:8px;border-radius:8px">
+              ? `<p class="muted" style="background:var(--bg);padding:8px;border-radius:8px">
                    جوابك يغطي أيضاً: ${g.similar.map((s) => `«${esc(s.question)}»`).join(' · ')}
                  </p>`
               : ''

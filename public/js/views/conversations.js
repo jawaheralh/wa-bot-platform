@@ -127,7 +127,7 @@ async function openThread(conversationId, main, staff) {
       }
       ${
         assignedToOther
-          ? `<div class="ok" style="background:#fdf3e2;color:#b7791f">هذه المحادثة مُسندة إلى ${esc(
+          ? `<div class="ok" style="background:var(--accent-soft);color:var(--accent-dark)">هذه المحادثة مُسندة إلى ${esc(
               assigneeName,
             )}.</div>`
           : ''

@@ -4,34 +4,99 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>تسجيل الدخول — منصة بوت واتساب</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>💬</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Amiri:ital@1&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/app.css">
   <style>
-    body { display: grid; place-items: center; min-height: 100vh; }
-    .box { width: min(360px, 92vw); }
-    .box h1 { font-size: 20px; margin: 0 0 2px; }
+    /**
+     * صفحة الدخول: جسر بين الصفحة الرئيسية واللوحة.
+     *
+     * تأخذ خلفية الهبوط العميقة وبطاقته البيضاء وحقوله ذات الخط
+     * السفلي، لأن العميل يصل إليها من الصفحة الرئيسية مباشرة —
+     * وانقطاع الهوية في هذه الخطوة بالذات يجعله يتساءل إن كان
+     * الرابط صحيحاً.
+     */
+    body {
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      padding: 24px;
+      background: var(--deep);
+    }
+
+    .box {
+      width: min(400px, 100%);
+      background: #fff;
+      border: 0;
+      border-radius: 24px;
+      box-shadow: 0 18px 48px rgba(59, 34, 41, 0.28);
+      padding: 34px 30px 30px;
+      margin: 0;
+    }
+
+    .home { display: inline-block; color: #fff; text-decoration: none; opacity: .8; font-size: 15px; margin-bottom: 14px }
+    .home:hover { opacity: 1 }
+
+    .kicker { font-family: 'Amiri', serif; font-style: italic; font-size: 24px; color: var(--accent); margin: 0 }
+    .box h1 { font-size: 24px; font-weight: 700; margin: 0 0 4px }
+    .box > p.muted { margin: 0 0 6px; font-size: 15px }
+
+    /* حقول بخط سفلي وتسمية عائمة — نفس نموذج الصفحة الرئيسية */
+    .field { position: relative; margin-top: 28px }
+    .field input {
+      width: 100%; border: 0; border-bottom: 2px solid var(--line); border-radius: 0;
+      background: transparent; padding: 8px 2px; font: inherit; font-size: 16px; color: var(--ink);
+    }
+    .field input:focus { outline: none; border-bottom-color: var(--accent) }
+    .field input:read-only { color: var(--muted) }
+    .field label {
+      position: absolute; inset-inline-start: 2px; top: 8px; margin: 0;
+      color: var(--muted); font-size: 16px; pointer-events: none; transition: .15s ease;
+    }
+    .field input:focus + label,
+    .field input:not(:placeholder-shown) + label {
+      top: -14px; font-size: 13px; color: var(--accent);
+    }
+
+    .btn.wide { width: 100%; padding: 13px; font-size: 16px; margin-top: 26px }
+    .hint { margin: 8px 0 0; font-size: 13px; color: var(--muted) }
+    #error { margin: 18px 0 0 }
   </style>
 </head>
 <body>
-  <form class="card box" id="form">
-    <h1>منصة بوت واتساب</h1>
-    <p class="muted" style="margin-top:0">سجّلي الدخول للمتابعة</p>
-    <div id="error" class="error" hidden></div>
-    <label for="username">اسم المستخدم</label>
-    <input id="username" name="username" autocomplete="username" required autofocus>
-    <label for="password">كلمة المرور</label>
-    <input id="password" name="password" type="password" autocomplete="current-password" required>
+  <div>
+    <a class="home" href="/">→ الصفحة الرئيسية</a>
 
-    <div id="totpStep" hidden>
-      <label for="code">رمز التحقق</label>
-      <input id="code" name="code" dir="ltr" inputmode="numeric" autocomplete="one-time-code"
-             maxlength="14" placeholder="123456">
-      <p class="muted" style="margin:6px 0 0">
-        من تطبيق المصادقة على جوالك، أو أحد رموز الاسترجاع.
-      </p>
-    </div>
+    <form class="card box" id="form">
+      <p class="kicker">أهلاً بك</p>
+      <h1>دخول العملاء</h1>
+      <p class="muted">سجّلي الدخول لمتابعة محادثات منشأتك.</p>
 
-    <div class="actions"><button class="btn" type="submit" id="submit" style="flex:1">دخول</button></div>
-  </form>
+      <div class="field">
+        <input id="username" name="username" autocomplete="username" required autofocus placeholder=" ">
+        <label for="username">اسم المستخدم</label>
+      </div>
+
+      <div class="field">
+        <input id="password" name="password" type="password" autocomplete="current-password" required placeholder=" ">
+        <label for="password">كلمة المرور</label>
+      </div>
+
+      <div id="totpStep" hidden>
+        <div class="field">
+          <input id="code" name="code" dir="ltr" inputmode="numeric" autocomplete="one-time-code"
+                 maxlength="14" placeholder=" ">
+          <label for="code">رمز التحقق</label>
+        </div>
+        <p class="hint">من تطبيق المصادقة على جوالك، أو أحد رموز الاسترجاع.</p>
+      </div>
+
+      <button class="btn wide" type="submit" id="submit">دخول</button>
+      <div id="error" class="error" hidden></div>
+    </form>
+  </div>
 
   <script type="module">
     const form = document.getElementById('form');
