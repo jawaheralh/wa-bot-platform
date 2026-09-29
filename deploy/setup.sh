@@ -44,10 +44,20 @@ chown -R wabot:wabot "$APP_DIR"
 
 echo "▸ تثبيت الاعتماديات"
 cd "$APP_DIR"
-sudo -u wabot npm ci --omit=dev
+chown -R wabot:wabot "$APP_DIR"
+sudo -u wabot npm ci --omit=dev 2>&1 | tail -3
 
-echo "▸ توليد أسرار الإنتاج"
-if [[ ! -f "$APP_DIR/.env" ]]; then
+echo "▸ الأسرار"
+if [[ -f "$APP_DIR/.env" ]]; then
+  # .env منقول من الجهاز: نضمن سرّ جلسة قوياً فقط
+  SECRET=$(grep -E '^SESSION_SECRET=' "$APP_DIR/.env" | cut -d= -f2-)
+  if [[ ${#SECRET} -lt 32 || "$SECRET" == *change-me* ]]; then
+    sudo -u wabot sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -hex 32)|" "$APP_DIR/.env"
+    echo "  وُلّد سرّ جلسة قوي (السابق كان ضعيفاً)"
+  else
+    echo "  المفاتيح المنقولة سليمة"
+  fi
+elif [[ ! -f "$APP_DIR/.env" ]]; then
   sudo -u wabot cp .env.example .env
   SECRET=$(openssl rand -hex 32)
   sudo -u wabot sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$SECRET|" .env
@@ -68,7 +78,7 @@ systemctl reload caddy || systemctl restart caddy
 echo
 echo "✓ تم. الخطوات المتبقية:"
 echo "   ١. املئي المفاتيح:  sudo -u wabot nano $APP_DIR/.env"
-echo "   ٢. أنشئي الأدمن:    cd $APP_DIR && sudo -u wabot node src/seed.ts"
+echo "   ٢. إن كانت قاعدة جديدة:  cd $APP_DIR && sudo -u wabot node src/seed.ts"
 echo "   ٣. أعيدي التشغيل:   sudo systemctl restart wa-bot"
 echo "   ٤. تابعي السجل:     sudo journalctl -u wa-bot -f"
 echo

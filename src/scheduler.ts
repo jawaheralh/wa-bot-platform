@@ -11,6 +11,7 @@ import { tickTargets } from './modules/registry.ts';
 import { purgeOldMessages, audit } from './compliance.ts';
 import { runHealthCheck, alertIfChanged } from './health.ts';
 import { backupIfDue } from './backup.ts';
+import { watchTunnel } from './tunnel.ts';
 import { today } from './time.ts';
 
 const TICK_MS = 60_000;
@@ -63,6 +64,13 @@ export function startScheduler(app: App): () => void {
 
       /* --- نسخة احتياطية يومية --- */
       if (day !== lastPurgeDay || !lastHealthCheck) backupIfDue(app);
+
+      /* --- مراقبة النفق كل نبضة: انقطاعه يوقف كل الرسائل --- */
+      try {
+        await watchTunnel(app);
+      } catch (error) {
+        deps.logger.error('فشلت مراقبة النفق', error);
+      }
 
       /* --- فحص الصحة كل ١٥ دقيقة --- */
       if (Date.now() - lastHealthCheck > 15 * 60_000) {
