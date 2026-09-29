@@ -84,9 +84,21 @@ export async function renderConversations(main) {
   main.querySelectorAll('[data-open]').forEach((button) => {
     button.onclick = guard(() => openThread(Number(button.dataset.open), main, active));
   });
+
+  /**
+   * المحادثة المفتوحة تُعاد بعد كل رسم.
+   *
+   * التحديث المباشر يُعيد رسم الشاشة كلما وصلت رسالة، فبلا هذا تُغلق
+   * المحادثة تحت يد الموظفة وهي تقرأها — وكلما زاد نشاط العملاء ساء
+   * الأمر، فتصير الميزة عائقاً.
+   */
+  if (state.openConversation && list.some((r) => r.id === state.openConversation)) {
+    await openThread(state.openConversation, main, active);
+  }
 }
 
 async function openThread(conversationId, main, staff) {
+  state.openConversation = conversationId;
   const { conversation, messages, assigneeName, viewer } = await get(
     `/api/tenants/${state.tenantId}/conversations/${conversationId}`,
   );

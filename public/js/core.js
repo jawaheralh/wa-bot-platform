@@ -9,6 +9,8 @@ export const state = {
   tenantId: null,
   tenants: [],
   view: 'overview',
+  /** المحادثة المفتوحة — تُعاد بعد كل تحديث مباشر فلا تُغلق تحت يد الموظفة. */
+  openConversation: null,
 };
 
 async function request(method, path, body) {
@@ -80,4 +82,48 @@ export function guard(handler) {
       flash(error.message, 'error');
     }
   };
+}
+
+/* ---------------------------------------------------------------
+   البث المباشر
+--------------------------------------------------------------- */
+
+let live = null;
+
+/**
+ * يشترك في بث تغيّرات المنشأة.
+ *
+ * EventSource يعيد الاتصال وحده إن انقطع، فلا نكتب منطق إعادة اتصال.
+ * لكنه يُبقي الاتصال مفتوحاً، فيلزم إغلاق السابق عند تبديل المنشأة —
+ * وإلا تراكمت اتصالات لمنشآت لم تعد معروضة.
+ */
+export function watchLive(tenantId, onChange) {
+  stopLive();
+  if (!tenantId) return;
+
+  const source = new EventSource(`/api/tenants/${tenantId}/stream`);
+  source.addEventListener('change', () => onChange());
+  live = source;
+}
+
+export function stopLive() {
+  if (live) {
+    live.close();
+    live = null;
+  }
+}
+
+/**
+ * هل المستخدمة في منتصف كتابة؟
+ *
+ * إعادة الرسم تمسح ما في الحقول. ورسالة نصف مكتوبة تختفي لأن عميلاً
+ * آخر أرسل شيئاً في تلك اللحظة عطلٌ يُفقد الثقة بالنظام كله — فنؤجّل
+ * التحديث بدل أن نتلف عملها.
+ */
+export function isTyping() {
+  const active = document.activeElement;
+  if (!active) return false;
+  const tag = active.tagName;
+  if (tag !== 'INPUT' && tag !== 'TEXTAREA') return false;
+  return String(active.value ?? '').trim().length > 0;
 }

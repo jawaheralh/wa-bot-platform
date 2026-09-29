@@ -560,6 +560,58 @@ export function registerTenantRoutes(
     return getTenant(db, id);
   });
 
+  /**
+   * بث مباشر لتغيّرات هذه المنشأة (SSE).
+   *
+   * SSE لا WebSocket: الاتجاه واحد — الخادم يُعلم المتصفح أن شيئاً
+   * تغيّر — و EventSource مدمج في المتصفح بلا مكتبة، ويعيد الاتصال
+   * وحده إن انقطع، ويمرّ عبر Caddy كأي استجابة HTTP.
+   *
+   * ولا تُرسَل البيانات في البث، بل إشارة «تغيّر شيء» فقط. فالمتصفح
+   * يطلب ما يعرضه بمساراته المحمية المعتادة — ولا يصير البث قناة
+   * ثانية للبيانات تحتاج حراسة مستقلة.
+   */
+  app.get('/api/tenants/:tenantId/stream', async (request, reply) => {
+    const id = tenantOf(request);
+    const { subscribe, signatureOf } = await import('../../live.ts');
+
+    reply.raw.writeHead(200, {
+      'content-type': 'text/event-stream; charset=utf-8',
+      'cache-control': 'no-cache, no-transform',
+      connection: 'keep-alive',
+      // Caddy لا يخزّن، لكن وسيطاً آخر قد يفعل فيبتلع البث كله.
+      'x-accel-buffering': 'no',
+    });
+
+    const write = (event: string, data: unknown): void => {
+      if (reply.raw.writableEnded) return;
+      reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    write('ready', { signature: signatureOf(db, id) });
+
+    const unsubscribe = subscribe(db, id, (event) => write('change', event));
+
+    /**
+     * نبضة كل ٢٥ ثانية.
+     *
+     * الوسطاء يقطعون اتصالاً صامتاً بعد دقيقة عادةً، فينقطع البث بلا
+     * أن يلاحظ أحد — والموظفة تظنّ أن لا جديد.
+     */
+    const beat = setInterval(() => write('ping', Date.now()), 25_000);
+    beat.unref?.();
+
+    const close = (): void => {
+      clearInterval(beat);
+      unsubscribe();
+    };
+    request.raw.on('close', close);
+    request.raw.on('error', close);
+
+    // لا نُنهي الرد: الاتصال يبقى مفتوحاً حتى يغلقه المتصفح.
+    return reply;
+  });
+
   /* --- التنبيهات --- */
   app.get('/api/tenants/:tenantId/alerts', async (request) => {
     const id = tenantOf(request);

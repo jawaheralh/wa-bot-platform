@@ -5,7 +5,7 @@
  * التبديل بينها، وأدمن المنشأة مثبَّت على منشأته.
  */
 
-import { get, post, state, esc, guard } from './core.js';
+import { get, post, state, esc, guard, watchLive, stopLive, isTyping } from './core.js';
 import { renderOverview } from './views/overview.js';
 import { renderConversations } from './views/conversations.js';
 import { renderComplaints } from './views/complaints.js';
@@ -76,6 +76,21 @@ function visibleViews() {
  * إغفالها هنا جعل الحارس أدناه يُعيدها إلى «نظرة عامة» عند كل ضغطة.
  */
 const SYSTEM_VIEWS = new Set(['setup', 'tenants', 'account']);
+
+/** تغيّر وصل أثناء الكتابة فأُجّل حتى تفرغ. */
+let pendingLive = false;
+
+/**
+ * ما إن تُغادر الحقلَ حتى يُطبَّق ما تأجّل.
+ *
+ * بلا هذا يبقى التحديث معلّقاً إلى أن يصل تغيّر جديد — فتبدو اللوحة
+ * متجمّدة بعد أن أُلغي ما كُتب.
+ */
+document.addEventListener('focusout', () => {
+  if (!pendingLive || isTyping()) return;
+  pendingLive = false;
+  void draw(document.querySelector('main'));
+});
 
 function render() {
   const views = visibleViews();
@@ -155,11 +170,27 @@ function render() {
   }
 
   document.getElementById('logout').onclick = guard(async () => {
+    stopLive();
     await post('/api/logout');
     location.href = '/login.html';
   });
 
   void draw(main);
+
+  /**
+   * البث المباشر: يُعاد ربطه مع كل رسم لأن المنشأة قد تتغيّر.
+   *
+   * والتحديث مؤجَّل أثناء الكتابة: إعادة الرسم تمسح الحقول، ورسالة
+   * نصف مكتوبة تختفي لأن عميلاً آخر أرسل شيئاً عطلٌ يُفقد الثقة
+   * بالنظام كله.
+   */
+  watchLive(state.tenantId, () => {
+    if (isTyping()) {
+      pendingLive = true;
+      return;
+    }
+    void draw(document.querySelector('main'));
+  });
 }
 
 async function draw(main) {
