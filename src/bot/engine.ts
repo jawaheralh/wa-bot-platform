@@ -29,6 +29,7 @@ import type { Transcriber } from '../stt/index.ts';
 import { storeMedia, isVisionImage, MAX_BYTES } from '../media.ts';
 import { MEDIA_AR } from '../whatsapp/provider.ts';
 import { readFileSync } from 'node:fs';
+import { redact, restore, restoreDeep, mergeMaps } from '../redact.ts';
 
 /** أكثر من هذا يعني أن النموذج يدور في حلقة، لا أنه يحتاج خطوة إضافية. */
 const MAX_TOOL_ROUNDS = 5;
@@ -220,10 +221,33 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
       convLogger.info('مُرّرت صورة للنموذج', { نوع: visionImage.mimeType });
     }
 
+    /**
+     * الإخفاء قبل المغادرة.
+     *
+     * الخادم في جدة، والنموذج على خوادم خارجها. فكل ما يُرسل يمرّ من
+     * هنا أولاً: الأرقام والهويات والآيبان تُستبدل برموز، والأصل يبقى
+     * في قاعدة البيانات كاملاً.
+     *
+     * على كامل السياق لا على آخر رسالة: رقم ذُكر قبل عشر رسائل يُعاد
+     * إرساله مع كل نداء، فإخفاء الأخيرة وحدها إخفاء لا معنى له.
+     */
+    const redactions: Map<string, string>[] = [];
+    if (config.redactPii) {
+      for (const entry of messages) {
+        if (typeof entry.content !== 'string') continue;
+        const { text: masked, map } = redact(entry.content);
+        if (map.size === 0) continue;
+        entry.content = masked;
+        redactions.push(map);
+      }
+    }
+    const pii = mergeMaps(redactions);
+
     convLogger.debug('تجميع السياق', {
       وحدات: enabled.map((e) => e.module.name).join(','),
       أدوات: tools.length,
       رسائل: messages.length,
+      مخفية: pii.size,
     });
 
     /* --- حلقة الأدوات --- */
@@ -256,11 +280,15 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
 
         for (const call of result.toolCalls) {
           convLogger.info('نداء أداة', { أداة: call.name });
-          const outcome = await dispatchTool(enabled, call.name, call.input, base);
+          // الأصل يعود قبل الحفظ: النموذج يطلب تسجيل طلب برمز، فتُسجّل
+          // الشركة الرقم الحقيقي. هنا تحصل المنشأة على بياناتها كاملة
+          // دون أن يكون النموذج قد رآها.
+          const input = restoreDeep(call.input, pii) as Record<string, unknown>;
+          const outcome = await dispatchTool(enabled, call.name, input, base);
 
           /* --- التحويل للموظف يكشف ثغرة في المعرفة: نسجّل السؤال --- */
           if (call.name === 'handoff_to_human') {
-            const reason = typeof call.input.reason === 'string' ? call.input.reason : '';
+            const reason = typeof input.reason === 'string' ? input.reason : '';
             recordGap(db, {
               tenantId: tenant.id,
               conversationId: conversation.id,
@@ -322,6 +350,15 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
       }
       reply = FALLBACK_REPLY;
     }
+
+    /**
+     * الرد يعود لأصله قبل أن يراه العميل.
+     *
+     * النموذج يردّد ما أعطيناه: «سجّلنا طلبك على ﴿جوال-1﴾». بلا هذا
+     * السطر يصل العميل رمزٌ داخلي فيبدو النظام معطوباً — وهو أثر
+     * يظهر عند العميل لا عندنا، فلا نراه إلا منه.
+     */
+    reply = restore(reply, pii);
 
     recordUsage(db, tenant.id, 'replies');
     await send(tenant, conversation.id, message.from, reply, convLogger);

@@ -53,6 +53,8 @@ export interface AppConfig {
   publicUrl: string;
   /** فتح لوحة التحكم على العنوان العام ليدخلها الموظفون من أي مكان. */
   publicPanel: boolean;
+  /** إخفاء أرقام العملاء وهوياتهم قبل إرسال السياق للنموذج. */
+  redactPii: boolean;
   dbPath: string;
   sessionSecret: string;
   logLevel: LogLevel;
@@ -147,6 +149,7 @@ export function loadConfig(): AppConfig {
     host: str('HOST', '127.0.0.1'),
     publicUrl: str('PUBLIC_URL').replace(/\/$/, ''),
     publicPanel: str('PUBLIC_PANEL', '0') === '1',
+    redactPii: str('REDACT_PII', '1') === '1',
     dbPath: str('DB_PATH', join(ROOT, 'data', 'app.db')),
     sessionSecret,
     logLevel,
