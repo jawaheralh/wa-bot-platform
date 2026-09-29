@@ -4,8 +4,15 @@
  * كل عميل يملك حساب واتساب أعمال خاصاً به: رقمه وتطبيقه وتوكنه. لا يمكن
  * أن يشترك عميلان في توكن واحد — التوكن يخوّل الإرسال باسم صاحبه.
  *
- * الفارغ يرث القيمة العامة من .env، فتبقى الحالة البسيطة بسيطة: منشآت
- * تحت حسابك أنتِ لا تحتاج إدخال شيء.
+ * ولا توارث بين المنشآت افتراضياً.
+ *
+ * كانت المنشأة الفارغة ترث قيم .env تسهيلاً. لكن تلك القيم في الواقع
+ * تخصّ أول عميل أُعدّ النظام له، فكان كل عميل جديد يعمل — بصمت — تحت
+ * تطبيق غيره وبتوكنه وعلى حساب Claude الخاص به: رقمه يظهر تحت تطبيق
+ * شركة أخرى، وفاتورته تُحمّل على غيره.
+ *
+ * والعطل لا يُرى: كل شيء يعمل. فصار التوارث قراراً صريحاً بمتغيّر
+ * SHARED_META_FALLBACK، وافتراضه الفصل.
  */
 
 import type { AppConfig } from './config.ts';
@@ -22,13 +29,24 @@ export interface MetaCredentials {
 
 export function credentialsFor(config: AppConfig, tenant: TenantRow | undefined): MetaCredentials {
   const own = Boolean(tenant?.wa_access_token && tenant.wa_app_secret);
-  return {
-    accessToken: tenant?.wa_access_token || config.cloud.accessToken,
-    appSecret: tenant?.wa_app_secret || config.cloud.appSecret,
-    appId: tenant?.wa_app_id || config.cloud.appId,
-    businessId: tenant?.wa_business_id || config.cloud.businessId,
-    own,
-  };
+  if (own || config.sharedMetaFallback) {
+    return {
+      accessToken: tenant?.wa_access_token || config.cloud.accessToken,
+      appSecret: tenant?.wa_app_secret || config.cloud.appSecret,
+      appId: tenant?.wa_app_id || config.cloud.appId,
+      businessId: tenant?.wa_business_id || config.cloud.businessId,
+      own,
+    };
+  }
+
+  /**
+   * منشأة بلا بيانات خاصة: فارغة لا موروثة.
+   *
+   * الفراغ يُنتج رسالة صريحة («بلا توكن Meta — أدخليه في إعدادات
+   * المنشأة») ويمنع تسجيل webhook لها. وهذا أفضل بكثير من أن تعمل
+   * على حساب عميل آخر بلا أن يعلم أحد.
+   */
+  return { accessToken: '', appSecret: '', appId: '', businessId: '', own: false };
 }
 
 /**

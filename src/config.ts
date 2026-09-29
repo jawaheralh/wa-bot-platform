@@ -55,6 +55,8 @@ export interface AppConfig {
   publicPanel: boolean;
   /** إخفاء أرقام العملاء وهوياتهم قبل إرسال السياق للنموذج. */
   redactPii: boolean;
+  /** السماح للمنشأة بلا بيانات Meta خاصة أن ترث القيم العامة من .env. */
+  sharedMetaFallback: boolean;
   dbPath: string;
   sessionSecret: string;
   logLevel: LogLevel;
@@ -150,6 +152,7 @@ export function loadConfig(): AppConfig {
     publicUrl: str('PUBLIC_URL').replace(/\/$/, ''),
     publicPanel: str('PUBLIC_PANEL', '0') === '1',
     redactPii: str('REDACT_PII', '1') === '1',
+    sharedMetaFallback: str('SHARED_META_FALLBACK', '0') === '1',
     dbPath: str('DB_PATH', join(ROOT, 'data', 'app.db')),
     sessionSecret,
     logLevel,

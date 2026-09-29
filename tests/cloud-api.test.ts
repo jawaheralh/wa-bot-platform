@@ -59,7 +59,11 @@ let received: IncomingMessage[];
 
 beforeEach(() => {
   db = freshDb();
-  seedTenant(db, { name: 'عيادة', waNumber: '966500000001', waPhoneNumberId: 'PNID_1' });
+  const clinic = seedTenant(db, { name: 'عيادة', waNumber: '966500000001', waPhoneNumberId: 'PNID_1' });
+  // ببيانات خاصة: هذا الملف يختبر آليّة الإرسال لا سياسة التوارث،
+  // فلا يصح أن يسقط بتغيّر تلك السياسة.
+  db.prepare('UPDATE tenants SET wa_access_token = ?, wa_app_secret = ? WHERE id = ?')
+    .run('test-token', APP_SECRET, clinic.id);
   provider = new CloudApiProvider(db, cloudConfig(), silentLogger());
   received = [];
   provider.onMessage(async (message) => void received.push(message));

@@ -3,6 +3,10 @@
  *
  * المحك التجاري: عميلان بحسابَي Meta مختلفين يعملان معاً على نفس النظام،
  * ولا يستطيع أحدهما الإرسال بتوكن الآخر.
+ *
+ * والافتراض الفصل لا التوارث: منشأة بلا بيانات خاصة لا ترث بيانات أول
+ * عميل أُعدّ النظام له، فتعمل تحت تطبيقه وتُحمّل فاتورتها عليه بلا أن
+ * يرى أحد عطلاً — كل شيء يعمل.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -20,6 +24,7 @@ function config(): AppConfig {
   return {
     ...loadConfig(),
     provider: 'cloud',
+    sharedMetaFallback: false,
     cloud: {
       verifyToken: 'v',
       appSecret: GLOBAL.secret,
@@ -51,9 +56,18 @@ afterEach(() => {
 });
 
 describe('اختيار بيانات الاعتماد', () => {
-  it('منشأة بلا حساب خاص ترث الحساب العام', () => {
+  it('منشأة بلا حساب خاص لا ترث شيئاً — هذا هو الافتراض', () => {
     const tenant = seedTenant(db, { name: 'عادية', waPhoneNumberId: 'PN1' });
     const c = credentialsFor(config(), getTenant(db, tenant.id));
+    expect(c.accessToken).toBe('');
+    expect(c.appSecret).toBe('');
+    expect(c.own).toBe(false);
+  });
+
+  it('وترث فقط حين يُطلب التوارث صراحةً', () => {
+    const tenant = seedTenant(db, { name: 'عادية', waPhoneNumberId: 'PN1' });
+    const shared = { ...config(), sharedMetaFallback: true };
+    const c = credentialsFor(shared, getTenant(db, tenant.id));
     expect(c.accessToken).toBe(GLOBAL.token);
     expect(c.own).toBe(false);
   });
@@ -75,8 +89,10 @@ describe('اختيار بيانات الاعتماد', () => {
 
 describe('الإرسال بتوكن المنشأة', () => {
   it('كل منشأة تُرسل بتوكنها هي', async () => {
-    const plain = seedTenant(db, { name: 'عادية', waNumber: '966500000001', waPhoneNumberId: 'PN_PLAIN' });
     const ownId = seedOwn('خاصة', '966500000002', 'PN_OWN');
+    const otherId = seedTenant(db, { name: 'أخرى', waNumber: '966500000004', waPhoneNumberId: 'PN_OTHER' }).id;
+    db.prepare('UPDATE tenants SET wa_access_token=?, wa_app_secret=?, wa_app_id=? WHERE id=?')
+      .run('TOKEN_2', 'dddddddddddddddddddddddddddddddd', 'APP_2', otherId);
 
     const calls: { url: string; auth: string }[] = [];
     vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
@@ -85,13 +101,20 @@ describe('الإرسال بتوكن المنشأة', () => {
     });
 
     const provider = new CloudApiProvider(db, config(), silentLogger());
-    await provider.sendText(plain.id, '966555555555', 'أ');
-    await provider.sendText(ownId, '966555555555', 'ب');
+    await provider.sendText(ownId, '966555555555', 'أ');
+    await provider.sendText(otherId, '966555555555', 'ب');
 
-    expect(calls[0]?.auth).toBe(`Bearer ${GLOBAL.token}`);
-    expect(calls[0]?.url).toContain('PN_PLAIN');
-    expect(calls[1]?.auth).toBe(`Bearer ${OWN.token}`);
-    expect(calls[1]?.url).toContain('PN_OWN');
+    expect(calls[0]?.auth).toBe(`Bearer ${OWN.token}`);
+    expect(calls[0]?.url).toContain('PN_OWN');
+    expect(calls[1]?.auth).toBe('Bearer TOKEN_2');
+    expect(calls[1]?.url).toContain('PN_OTHER');
+  });
+
+  /** الأهم تجارياً: عميل جديد لا يُرسل بتوكن عميل قديم. */
+  it('منشأة بلا بيانات خاصة تُرفض ولا تُرسل بتوكن غيرها', async () => {
+    const plain = seedTenant(db, { name: 'جديدة', waNumber: '966500000001', waPhoneNumberId: 'PN_PLAIN' });
+    const provider = new CloudApiProvider(db, config(), silentLogger());
+    await expect(provider.sendText(plain.id, '966555555555', 'أ')).rejects.toThrow(/توكن Meta/);
   });
 
   it('منشأة بلا توكن ولا حساب عام تُرفض برسالة واضحة', async () => {
@@ -137,15 +160,25 @@ describe('التحقق من التوقيع', () => {
 });
 
 describe('تجميع المنشآت بالتطبيق', () => {
-  it('منشآت الحساب العام في مجموعة، والخاصة في أخرى', () => {
+  it('لا تُسجَّل webhook لمنشأة بلا بيانات خاصة', () => {
     seedTenant(db, { name: 'أ', waNumber: '966500000001', waPhoneNumberId: 'PN1' });
     seedTenant(db, { name: 'ب', waNumber: '966500000002', waPhoneNumberId: 'PN2' });
     seedOwn('ج', '966500000003', 'PN3');
 
     const groups = tenantsByApp(db, config());
-    expect(groups.size).toBe(2);
-    expect(groups.get(GLOBAL.app)?.tenants).toHaveLength(2);
+    // الخاصة وحدها — الاثنتان بلا بيانات لا تُسجَّلان تحت تطبيق غيرهما
+    expect(groups.size).toBe(1);
     expect(groups.get(OWN.app)?.tenants).toHaveLength(1);
+    expect(groups.get(GLOBAL.app)).toBeUndefined();
+  });
+
+  it('ومع التوارث الصريح تنضم للمجموعة العامة', () => {
+    seedTenant(db, { name: 'أ', waNumber: '966500000001', waPhoneNumberId: 'PN1' });
+    seedOwn('ج', '966500000003', 'PN3');
+
+    const groups = tenantsByApp(db, { ...config(), sharedMetaFallback: true });
+    expect(groups.size).toBe(2);
+    expect(groups.get(GLOBAL.app)?.tenants).toHaveLength(1);
   });
 
   it('المنشأة الموقوفة أو بلا معرّف رقم تُستثنى', () => {
