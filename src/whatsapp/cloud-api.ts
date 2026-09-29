@@ -68,6 +68,45 @@ interface CloudPayload {
   entry?: { changes?: { field?: string; value?: CloudValue }[] }[];
 }
 
+/**
+ * يترجم رفض Meta إلى سبب يفهمه الموظف.
+ *
+ * أهمّها نافذة الأربع والعشرين ساعة: لا يسمح واتساب بإرسال نص حر
+ * لعميل لم يراسلك خلالها — قاعدة Meta لا قيد نظامنا. وكان الرفض
+ * يظهر JSON خاماً، فيبدو عطلاً في النظام ويُفتَح بلاغ لا محلّ له،
+ * بينما الحل قالب معتمد لا إصلاح.
+ */
+export function explainSendFailure(status: number, body: string): string {
+  let code = 0;
+  let detail = '';
+  try {
+    const parsed = JSON.parse(body) as { error?: { code?: number; message?: string; error_data?: { details?: string } } };
+    code = parsed.error?.code ?? 0;
+    detail = parsed.error?.error_data?.details ?? parsed.error?.message ?? '';
+  } catch {
+    detail = body.slice(0, 200);
+  }
+
+  // 131047: انقضت النافذة. 131026: الرقم لا يستقبل (ليس على واتساب أو حظر).
+  if (code === 131047) {
+    return (
+      'مضى أكثر من ٢٤ ساعة على آخر رسالة من العميل، وواتساب لا يسمح ' +
+      'بإرسال نص حر بعدها. يلزم قالب رسالة معتمد من Meta لبدء المحادثة.'
+    );
+  }
+  if (code === 131026) {
+    return 'الرقم لا يستقبل رسائل واتساب — قد يكون غير مسجّل أو حظر الرقم.';
+  }
+  if (code === 131056) {
+    return 'أُرسلت رسائل كثيرة لهذا الرقم في وقت قصير. انتظري قليلاً.';
+  }
+  if (code === 190 || status === 401) {
+    return 'توكن Meta منتهٍ أو غير صالح — جدّديه في إعدادات هذه المنشأة.';
+  }
+
+  return `رفضت Meta الإرسال (${status})${detail ? `: ${detail}` : ''}`;
+}
+
 export class CloudApiProvider implements WhatsAppProvider {
   readonly name = 'cloud';
 
@@ -140,7 +179,7 @@ export class CloudApiProvider implements WhatsAppProvider {
         if (!response.ok) {
           // ٤xx غير 429 خطأ في الطلب نفسه؛ تكراره يستهلك حدّ المعدّل بلا فائدة.
           const retryable = response.status === 429 || response.status >= 500;
-          const error = new Error(`فشل الإرسال (${response.status}): ${body}`);
+          const error = new Error(explainSendFailure(response.status, body));
           throw retryable ? error : markNoRetry(error);
         }
         return JSON.parse(body) as { messages?: { id?: string }[] };

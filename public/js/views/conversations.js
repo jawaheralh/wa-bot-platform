@@ -163,6 +163,8 @@ async function openThread(conversationId, main, staff) {
           : '<div class="empty">لا رسائل.</div>'
       }</div>
 
+      ${windowNotice(messages)}
+
       <label for="reply">رد يدوي (يُسكت البوت تلقائياً ويُسجَّل باسمك)</label>
       <textarea id="reply" placeholder="اكتبي ردك للعميل…"></textarea>
       <div class="actions">
@@ -274,4 +276,48 @@ function silenceNotice(conversation) {
         عليها آلياً. اضغطي «أعيدي البوت الآن» إن لم تعد هناك حاجة للتدخّل.
       </p>
     </div>`;
+}
+
+
+/* ---------------------------------------------------------------
+   نافذة الأربع والعشرين ساعة
+--------------------------------------------------------------- */
+
+/**
+ * واتساب لا يسمح بنص حر بعد ٢٤ ساعة من آخر رسالة للعميل.
+ *
+ * قاعدة Meta لا قيد نظامنا، ولا حيلة فيها إلا قالب معتمد. وإظهارها
+ * قبل الكتابة يوفّر على الموظفة أن تكتب رداً طويلاً ثم يُرفض — وأن
+ * تظنّ العطل في النظام.
+ */
+function windowNotice(messages) {
+  const last = [...messages].reverse().find((m) => m.role === 'customer');
+  if (!last) return '';
+
+  const sent = new Date(`${last.created_at.replace(' ', 'T')}+03:00`).getTime();
+  const closesAt = sent + 24 * 3600_000;
+  const left = closesAt - Date.now();
+
+  if (left <= 0) {
+    return `
+      <div class="warn-box">
+        ⏳ <strong>انتهت نافذة الرد (٢٤ ساعة من آخر رسالة للعميل)</strong>
+        <p class="muted" style="margin:6px 0 0">
+          واتساب لا يسمح بإرسال نص حر بعدها — قاعدة من Meta لا قيد في
+          النظام. لبدء المحادثة يلزم <strong>قالب رسالة معتمد</strong>.
+          رسالة العميل القادمة تفتح النافذة من جديد.
+        </p>
+      </div>`;
+  }
+
+  // التنبيه في الساعتين الأخيرتين فقط: تنبيه دائم يُتجاهَل.
+  if (left < 2 * 3600_000) {
+    const minutes = Math.round(left / 60_000);
+    return `
+      <div class="warn-box">
+        ⏳ يتبقّى <strong>${minutes} دقيقة</strong> على انتهاء نافذة الرد.
+        بعدها لا يُقبل إلا قالب معتمد.
+      </div>`;
+  }
+  return '';
 }
