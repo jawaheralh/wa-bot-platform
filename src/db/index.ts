@@ -106,6 +106,8 @@ export interface ConversationRow {
   is_test: number;
   /** آخر متابعة قبل إغلاق النافذة — يمنع تكرارها لنفس النافذة. */
   followup_at: string | null;
+  /** whatsapp اليوم؛ instagram أو email أو غيرها حين تُضاف. */
+  channel: string;
   last_message_at: string | null;
   created_at: string;
 }
@@ -196,11 +198,37 @@ export function listTenants(db: Db): TenantRow[] {
 --------------------------------------------------------------- */
 
 /** يجد المحادثة أو يُنشئها — كل (منشأة، رقم عميل) لها صف واحد أبداً. */
-export function getOrCreateConversation(db: Db, tenantId: number, customerWa: string, name?: string): ConversationRow {
-  const number = normalizeNumber(customerWa);
+/** القناة الافتراضية — الوحيدة العاملة اليوم. */
+export const DEFAULT_CHANNEL = 'whatsapp';
+
+/**
+ * مفتاح العميل داخل المنشأة.
+ *
+ * واتساب يحتفظ برقمه مجرّداً فلا تُهاجَر بيانات قائمة، وكل قناة أخرى
+ * تُسبَق باسمها. وبهذا يمنع القيدُ القائم UNIQUE (tenant_id,
+ * customer_wa) التصادمَ بين قناتين من تلقاء نفسه: الرقم ٥٥٥ على
+ * واتساب غير «instagram:555».
+ *
+ * البديل — إعادة بناء الجدول لتوسيع القيد — مخاطرة على محادثات عميل
+ * يعمل، لأجل قناة لم تُبنَ بعد.
+ */
+export function channelKey(channel: string, externalId: string): string {
+  const id = (externalId ?? '').trim();
+  if (channel === DEFAULT_CHANNEL) return normalizeNumber(id);
+  return `${channel}:${id}`;
+}
+
+export function getOrCreateConversation(
+  db: Db,
+  tenantId: number,
+  customerWa: string,
+  name?: string,
+  channel: string = DEFAULT_CHANNEL,
+): ConversationRow {
+  const key = channelKey(channel, customerWa);
   const existing = db
     .prepare('SELECT * FROM conversations WHERE tenant_id = ? AND customer_wa = ?')
-    .get(tenantId, number) as ConversationRow | undefined;
+    .get(tenantId, key) as ConversationRow | undefined;
   if (existing) {
     if (name && !existing.customer_name) {
       db.prepare('UPDATE conversations SET customer_name = ? WHERE id = ?').run(name, existing.id);
@@ -209,8 +237,8 @@ export function getOrCreateConversation(db: Db, tenantId: number, customerWa: st
     return existing;
   }
   const info = db
-    .prepare('INSERT INTO conversations (tenant_id, customer_wa, customer_name) VALUES (?, ?, ?)')
-    .run(tenantId, number, name ?? null);
+    .prepare('INSERT INTO conversations (tenant_id, customer_wa, customer_name, channel) VALUES (?, ?, ?, ?)')
+    .run(tenantId, key, name ?? null, channel);
   return db.prepare('SELECT * FROM conversations WHERE id = ?').get(info.lastInsertRowid) as ConversationRow;
 }
 

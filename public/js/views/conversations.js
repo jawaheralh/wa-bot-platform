@@ -110,6 +110,7 @@ async function openThread(conversationId, main, staff) {
     <div class="card">
       <h3>${esc(conversation.customer_name || conversation.customer_wa)}
         <span class="num muted" style="font-weight:400">${esc(conversation.customer_wa)}</span>
+        ${channelBadge(conversation)}
         ${conversation.customer_city ? `<span class="badge grey">${esc(conversation.customer_city)}</span>` : ''}
         ${conversation.contact_phone ? `<span class="badge grey num">${esc(conversation.contact_phone)}</span>` : ''}
       </h3>
@@ -411,4 +412,25 @@ async function renderTemplates(box, conversation, main, staff) {
     await renderConversations(main);
     await openThread(conversation.id, main, staff);
   });
+}
+
+
+/**
+ * شارة القناة — تظهر حين لا تكون واتساب.
+ *
+ * إظهارها على كل محادثة اليوم ضجيج: القنوات كلها واتساب، فتصير شارة
+ * لا تميّز شيئاً. وحين تُضاف قناة تبدأ بالظهور من تلقاء نفسها.
+ */
+const CHANNEL_AR = {
+  whatsapp: 'واتساب',
+  instagram: 'إنستغرام',
+  messenger: 'ماسنجر',
+  email: 'البريد',
+  web: 'الموقع',
+};
+
+function channelBadge(conversation) {
+  const channel = conversation.channel ?? 'whatsapp';
+  if (channel === 'whatsapp') return '';
+  return `<span class="badge grey">${esc(CHANNEL_AR[channel] ?? channel)}</span>`;
 }

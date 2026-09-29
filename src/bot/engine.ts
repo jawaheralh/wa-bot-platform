@@ -17,6 +17,7 @@ import {
   saveMessage,
   botMayReply,
   latestCustomerMessageAt,
+  DEFAULT_CHANNEL,
   silenceConversation,
   type TenantRow,
 } from '../db/index.ts';
@@ -83,7 +84,9 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
     }
 
     const logger = app.logger.child({ tenant: tenant.id, منشأة: tenant.name });
-    const conversation = getOrCreateConversation(db, tenant.id, message.from, message.pushName);
+    // القناة من الرسالة لا من المزوّد: مزوّد واحد قد يخدم أكثر من قناة.
+    const channel = message.channel ?? DEFAULT_CHANNEL;
+    const conversation = getOrCreateConversation(db, tenant.id, message.from, message.pushName, channel);
     const convLogger = logger.child({ conversation: conversation.id });
 
     /* --- تدخّل الموظف يدوياً: نسجّله ونصمت، ولا نرد --- */
@@ -197,7 +200,7 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
 
     /* --- تجميع ما تراه Claude لهذه المنشأة تحديداً --- */
     const nowSql = now();
-    const fresh = getOrCreateConversation(db, tenant.id, message.from);
+    const fresh = getOrCreateConversation(db, tenant.id, message.from, undefined, channel);
     const base: Omit<ModuleContext, 'config'> = {
       db,
       tenant,

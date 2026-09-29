@@ -34,6 +34,13 @@ export interface IncomingMedia {
 
 /** رسالة واردة بعد تطبيعها من أي مزوّد. */
 export interface IncomingMessage {
+  /**
+   * القناة التي وصلت منها — whatsapp حين تُهمَل.
+   *
+   * وجودها في العقد من اليوم يعني أن قناة جديدة تُضاف بملف مزوّد
+   * واحد: المحرّك يمرّرها كما هي، ولا يُعاد فتح ملفاته لأجلها.
+   */
+  channel?: string;
   /** الرقم المستقبِل (رقم المنشأة) — مفتاح التوجيه في Baileys والمحاكي. */
   toNumber: string;
   /** معرّف الرقم في Cloud API — مفتاح التوجيه البديل حين لا يُعطى الرقم نفسه. */
@@ -85,6 +92,8 @@ export interface TemplateSummary {
 
 export interface WhatsAppProvider {
   readonly name: string;
+  /** القناة التي يخدمها هذا المزوّد. whatsapp حين تُهمَل. */
+  readonly channel?: string;
   /** يبدأ الاتصال لكل المنشآت النشطة. */
   start(): Promise<void>;
   stop(): Promise<void>;

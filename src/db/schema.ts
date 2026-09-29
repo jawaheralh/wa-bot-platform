@@ -195,6 +195,16 @@ export const CORE_COLUMNS: [table: string, column: string, definition: string][]
   ['conversations', 'is_test', 'INTEGER NOT NULL DEFAULT 0'],
   // آخر متابعة أُرسلت — تُقارَن بآخر رسالة للعميل فلا تتكرر لنافذة واحدة.
   ['conversations', 'followup_at', 'TEXT'],
+  /**
+   * القناة التي وصلت منها المحادثة.
+   *
+   * افتراضها whatsapp فلا تُمَسّ البيانات القائمة. وقيمتها اليوم للعرض
+   * والمنطق (نافذة كل قناة تختلف)، أما منع التصادم فيتكفّل به
+   * channelKey أدناه — لأن UNIQUE (tenant_id, customer_wa) قائم في
+   * الجدول، وSQLite لا يعدّل القيود بـALTER، وإعادة بناء جدول محادثات
+   * عميل يعمل ليست مخاطرة تُحتمَل لأجل قناة لم تُبنَ بعد.
+   */
+  ['conversations', 'channel', "TEXT NOT NULL DEFAULT 'whatsapp'"],
   ['messages', 'user_id', 'INTEGER'],
   ['messages', 'media_path', 'TEXT'],
   ['messages', 'media_name', 'TEXT'],
