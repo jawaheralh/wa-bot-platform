@@ -324,6 +324,66 @@ export function registerTenantRoutes(
     return { ok: true };
   });
 
+  /* --- تدريب البوت: أسئلة عجز عنها --- */
+  app.get('/api/tenants/:tenantId/gaps', async (request) => {
+    const id = tenantOf(request);
+    const { listGaps, gapSummary, similarGaps } = await import('../../training.ts');
+    const status = (request.query as { status?: string })?.status ?? 'open';
+    const gaps = listGaps(db, id, status as never);
+    return {
+      gaps: gaps.map((gap) => ({
+        ...gap,
+        similar: status === 'open' ? similarGaps(db, id, gap).map((g) => ({ id: g.id, question: g.question })) : [],
+      })),
+      summary: gapSummary(db, id),
+    };
+  });
+
+  /** جواب لسؤال ناقص: يُضاف للمعرفة ويُغلق السؤال في خطوة واحدة. */
+  app.post('/api/tenants/:tenantId/gaps/:gapId/answer', async (request) => {
+    const id = adminOf(request);
+    const gapId = Number((request.params as Params & { gapId: string }).gapId);
+    const body = (request.body ?? {}) as { question?: string; answer?: string };
+
+    const { listGaps, setGapStatus } = await import('../../training.ts');
+    const gap = listGaps(db, id, 'all').find((g) => g.id === gapId);
+    if (!gap) throw Object.assign(new Error('السؤال غير موجود.'), { statusCode: 404 });
+
+    const entry = addKbEntry(db, id, (body.question ?? gap.question).trim(), (body.answer ?? '').trim());
+    setGapStatus(db, id, gapId, 'answered');
+
+    // الأسئلة المتشابهة يكفيها نفس الجواب — إغلاقها يوفّر كتابته مرات.
+    const { similarGaps } = await import('../../training.ts');
+    const closed: string[] = [];
+    for (const similar of similarGaps(db, id, gap)) {
+      setGapStatus(db, id, similar.id, 'answered');
+      closed.push(similar.question);
+    }
+
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username,
+      action: 'kb_change',
+      target: 'تدريب',
+      detail: `أُجيب عن: ${gap.question.slice(0, 60)}`,
+      ip: request.ip,
+    });
+    return { entry, gapId, closed };
+  });
+
+  app.patch('/api/tenants/:tenantId/gaps/:gapId', async (request) => {
+    const id = adminOf(request);
+    const gapId = Number((request.params as Params & { gapId: string }).gapId);
+    const status = (request.body as { status?: string })?.status;
+    if (status !== 'open' && status !== 'ignored' && status !== 'answered') {
+      throw Object.assign(new Error('حالة غير معروفة.'), { statusCode: 400 });
+    }
+    const { setGapStatus } = await import('../../training.ts');
+    setGapStatus(db, id, gapId, status);
+    return { ok: true };
+  });
+
   /* --- إعدادات الوحدات --- */
   app.get('/api/tenants/:tenantId/modules', async (request) => {
     const id = tenantOf(request);

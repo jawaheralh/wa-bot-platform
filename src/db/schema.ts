@@ -94,6 +94,22 @@ export const CORE_TABLES: string[] = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_audit_tenant ON audit_log(tenant_id, id DESC)`,
 
+  /* --- ثغرات المعرفة: أسئلة عجز عنها البوت مع عملاء حقيقيين --- */
+  `CREATE TABLE IF NOT EXISTS knowledge_gaps (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id       INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
+    question        TEXT    NOT NULL,
+    normalized      TEXT    NOT NULL,          -- للتجميع: نفس السؤال بصيغ مختلفة
+    reason          TEXT    NOT NULL DEFAULT '',
+    occurrences     INTEGER NOT NULL DEFAULT 1,
+    status          TEXT    NOT NULL DEFAULT 'open',  -- open | answered | ignored
+    created_at      TEXT    NOT NULL DEFAULT (${SQL_NOW}),
+    last_seen_at    TEXT    NOT NULL DEFAULT (${SQL_NOW}),
+    UNIQUE (tenant_id, normalized)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_gaps_tenant ON knowledge_gaps(tenant_id, status, occurrences DESC)`,
+
   /* --- سجل فحص الصحة: آخر نتيجة لكل فحص --- */
   `CREATE TABLE IF NOT EXISTS health_log (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,

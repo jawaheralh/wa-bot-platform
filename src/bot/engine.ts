@@ -23,6 +23,7 @@ import { composePrompt, composeTools, dispatchTool, enabledFor } from '../module
 import { basePrompt, FALLBACK_REPLY, VOICE_DISABLED_REPLY } from './prompt.ts';
 import { buildHistory } from './history.ts';
 import { now } from '../time.ts';
+import { recordGap } from '../training.ts';
 import type { Transcriber } from '../stt/index.ts';
 
 /** أكثر من هذا يعني أن النموذج يدور في حلقة، لا أنه يحتاج خطوة إضافية. */
@@ -145,6 +146,18 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
         for (const call of result.toolCalls) {
           convLogger.info('نداء أداة', { أداة: call.name });
           const outcome = await dispatchTool(enabled, call.name, call.input, base);
+
+          /* --- التحويل للموظف يكشف ثغرة في المعرفة: نسجّل السؤال --- */
+          if (call.name === 'handoff_to_human') {
+            const reason = typeof call.input.reason === 'string' ? call.input.reason : '';
+            recordGap(db, {
+              tenantId: tenant.id,
+              conversationId: conversation.id,
+              question: text,
+              reason,
+            });
+            convLogger.info('سُجّلت ثغرة معرفة', { سؤال: text.slice(0, 60) });
+          }
           toolResults.push({
             type: 'tool_result',
             tool_use_id: call.id,

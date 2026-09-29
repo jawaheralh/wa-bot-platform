@@ -13,6 +13,7 @@ import { renderKnowledge } from './views/knowledge.js';
 import { renderModules } from './views/modules.js';
 import { renderTenants } from './views/tenants.js';
 import { renderSetup } from './views/setup.js';
+import { renderTraining } from './views/training.js';
 import { renderStaff } from './views/staff.js';
 import { renderRequests } from './views/requests.js';
 import { renderPrivacy } from './views/privacy.js';
@@ -25,6 +26,7 @@ const VIEWS = [
   { id: 'requests', label: 'الطلبات', render: renderRequests, module: 'requests' },
   { id: 'bookings', label: 'المواعيد', render: renderBookings, module: 'bookings' },
   { id: 'knowledge', label: 'قاعدة المعرفة', render: renderKnowledge },
+  { id: 'training', label: 'تدريب البوت', render: renderTraining },
   { id: 'staff', label: 'الموظفون', render: renderStaff },
   { id: 'privacy', label: 'الخصوصية', render: renderPrivacy },
   { id: 'modules', label: 'الوحدات', render: renderModules },
