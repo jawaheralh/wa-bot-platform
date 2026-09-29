@@ -9,8 +9,10 @@ export const state = {
   tenantId: null,
   tenants: [],
   view: 'overview',
-  /** المحادثة المفتوحة — تُعاد بعد كل تحديث مباشر فلا تُغلق تحت يد الموظفة. */
+  /** المحادثة المفتوحة — تُعاد بعد كل تحديث مباشر فلا تُغلق تحت يد الموظف. */
   openConversation: null,
+  /** هوية المنشأة المفتوحة: ألوانها وشعارها. */
+  branding: null,
 };
 
 async function request(method, path, body) {
@@ -126,4 +128,45 @@ export function isTyping() {
   const tag = active.tagName;
   if (tag !== 'INPUT' && tag !== 'TEXTAREA') return false;
   return String(active.value ?? '').trim().length > 0;
+}
+
+/* ---------------------------------------------------------------
+   هوية المنشأة
+--------------------------------------------------------------- */
+
+/**
+ * يُلبس اللوحةَ ألوانَ المنشأة.
+ *
+ * بمتغيّرات CSS على الجذر لا بورقة أنماط ثانية: كل لون في اللوحة يشير
+ * إلى متغيّر أصلاً، فتغييره هنا يسري على كل شاشة — بما فيها ما يُكتب
+ * مستقبلاً — بلا أن يعرف أحدها بالهوية شيئاً.
+ */
+export function applyBranding(branding) {
+  state.branding = branding;
+  const root = document.documentElement.style;
+
+  if (!branding) {
+    for (const name of ['--accent', '--accent-dark', '--accent-soft', '--deep', '--accent-ink', '--bg', '--line']) {
+      root.removeProperty(name);
+    }
+    return;
+  }
+
+  root.setProperty('--accent', branding.accent);
+  root.setProperty('--accent-dark', branding.accentDark);
+  root.setProperty('--accent-soft', branding.accentSoft);
+  root.setProperty('--deep', branding.deep);
+  root.setProperty('--accent-ink', branding.accentInk);
+  root.setProperty('--bg', branding.bg);
+  root.setProperty('--line', branding.line);
+}
+
+/** يقرأ الهوية ويطبّقها. الفشل لا يمنع فتح اللوحة — تُعرض بألوان المنصة. */
+export async function loadBranding(tenantId) {
+  if (!tenantId) return applyBranding(null);
+  try {
+    applyBranding(await get(`/api/tenants/${tenantId}/branding`));
+  } catch {
+    applyBranding(null);
+  }
 }

@@ -89,7 +89,11 @@ export async function renderTenants(main, onPick) {
     </div>
 
     <div class="card">
-      <h3>إضافة منشأة</h3>
+      <h3>إعداد منشأة جديدة</h3>
+      <p class="muted" style="margin-top:0">
+        بعد الإنشاء: «الهوية» للون والشعار، و«الإعداد» لربط الرقم بـMeta،
+        و«قاعدة المعرفة» لملف التأسيس.
+      </p>
       <div class="row">
         <div><label for="name">اسم المنشأة</label><input id="name" placeholder="عيادة النور"></div>
         <div><label for="waNumber">رقم واتساب</label><input id="waNumber" dir="ltr" placeholder="966500000001"></div>
@@ -104,6 +108,13 @@ export async function renderTenants(main, onPick) {
       <div class="row">
         <div><label for="adminUsername">مستخدم أدمن المنشأة</label><input id="adminUsername" dir="ltr" placeholder="noor"></div>
         <div><label for="adminPassword">كلمة المرور (٨ أحرف فأكثر)</label><input id="adminPassword" type="password"></div>
+        <div style="max-width:180px">
+          <label for="brandColor">لون المنشأة</label>
+          <div class="color-pick">
+            <input id="brandColorDot" type="color" value="#c9772b">
+            <input id="brandColor" dir="ltr" value="#c9772b" maxlength="7">
+          </div>
+        </div>
       </div>
       <div class="actions"><button class="btn" id="create">إنشاء</button></div>
     </div>
@@ -154,6 +165,13 @@ export async function renderTenants(main, onPick) {
     await renderTenants(main, onPick);
   });
 
+  const brandDot = document.getElementById('brandColorDot');
+  const brandText = document.getElementById('brandColor');
+  brandDot.oninput = () => (brandText.value = brandDot.value);
+  brandText.onchange = () => {
+    if (/^#[0-9a-fA-F]{6}$/.test(brandText.value.trim())) brandDot.value = brandText.value.trim();
+  };
+
   document.getElementById('create').onclick = guard(async () => {
     const value = (id) => document.getElementById(id).value.trim();
     const tenant = await post('/api/system/tenants', {
@@ -164,6 +182,7 @@ export async function renderTenants(main, onPick) {
       waPhoneNumberId: value('waPhoneNumberId'),
       adminUsername: value('adminUsername'),
       adminPassword: document.getElementById('adminPassword').value,
+      brandColor: value('brandColor'),
     });
     flash(`أُنشئت «${tenant.name}».`);
     await renderTenants(main, onPick);

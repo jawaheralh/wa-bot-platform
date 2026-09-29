@@ -5,7 +5,7 @@
  * التبديل بينها، وأدمن المنشأة مثبَّت على منشأته.
  */
 
-import { get, post, state, esc, guard, watchLive, stopLive, isTyping } from './core.js';
+import { get, post, state, esc, guard, watchLive, stopLive, isTyping, loadBranding } from './core.js';
 import { renderOverview } from './views/overview.js';
 import { renderConversations } from './views/conversations.js';
 import { renderComplaints } from './views/complaints.js';
@@ -21,6 +21,7 @@ import { renderBookings } from './views/bookings.js';
 import { renderAccount } from './views/account.js';
 import { renderTenantSetup } from './views/tenant-setup.js';
 import { renderLeads } from './views/leads.js';
+import { renderBranding } from './views/branding.js';
 
 const VIEWS = [
   { id: 'overview', label: 'نظرة عامة', render: renderOverview },
@@ -32,11 +33,12 @@ const VIEWS = [
   { id: 'training', label: 'تدريب البوت', render: renderTraining },
   { id: 'staff', label: 'الموظفون', render: renderStaff },
   { id: 'privacy', label: 'الخصوصية', render: renderPrivacy },
+  { id: 'branding', label: 'الهوية', render: renderBranding },
   { id: 'modules', label: 'الوحدات', render: renderModules },
 ];
 
 /** شاشات يراها مالك المنشأة وأدمن النظام دون الموظف. */
-const OWNER_ONLY = new Set(['knowledge', 'modules', 'privacy']);
+const OWNER_ONLY = new Set(['knowledge', 'modules', 'privacy', 'branding']);
 
 const root = document.getElementById('root');
 
@@ -52,6 +54,8 @@ async function boot() {
 
   // شاشة المواعيد تظهر فقط إذا كانت وحدة الحجوزات مفعّلة لهذه المنشأة.
   await loadEnabledModules();
+  // الهوية قبل أول رسم: تحميلها بعده يجعل اللوحة تومض بلون ثم بلون.
+  await loadBranding(state.tenantId);
   render();
 }
 
@@ -60,6 +64,22 @@ async function loadEnabledModules() {
   if (!state.tenantId) return;
   const { modules } = await get(`/api/tenants/${state.tenantId}/modules`);
   state.enabledModules = modules.filter((m) => m.enabled).map((m) => m.name);
+}
+
+/**
+ * علامة الشريط الجانبي: شعار المنشأة واسمها إن كانا، وإلا اسم المنصة.
+ *
+ * الموظف يفتح هذه الشاشة كل صباح، ورؤيته شعار منشأته لا شعارنا هي
+ * الفرق بين «نظام اشتروه» و«نظامهم».
+ */
+function brandMark() {
+  const tenant = state.tenants.find((t) => t.id === state.tenantId);
+  const name = state.branding?.name || tenant?.name || (state.me.role === 'system' ? 'لوحة التحكم' : 'بوت واتساب');
+  const logo = state.branding?.logoUrl;
+
+  return logo
+    ? `<h1 class="has-logo"><img class="brand-logo" src="${esc(logo)}" alt=""> ${esc(name)}</h1>`
+    : `<h1>${esc(name)}</h1>`;
 }
 
 function visibleViews() {
@@ -103,7 +123,7 @@ function render() {
   root.innerHTML = `
     <div class="layout">
       <aside class="sidebar">
-        <h1>بوت واتساب</h1>
+        ${brandMark()}
         <div class="who">${esc(state.me.displayName)} · ${esc(
           { system: 'أدمن النظام', tenant: 'مالك المنشأة', agent: 'موظف' }[state.me.role] ?? state.me.role,
         )}</div>
@@ -155,10 +175,13 @@ function render() {
   const main = root.querySelector('main');
 
   root.querySelectorAll('[data-view]').forEach((button) => {
-    button.onclick = () => {
+    button.onclick = guard(async () => {
+      const leavingBranding = state.view === 'branding' && button.dataset.view !== 'branding';
       state.view = button.dataset.view;
+      // معاينة الهوية تغيّر ألوان اللوحة قبل الحفظ؛ الخروج بلا حفظ يعيدها.
+      if (leavingBranding) await loadBranding(state.tenantId);
       render();
-    };
+    });
   });
 
   const picker = document.getElementById('tenantPicker');
@@ -167,6 +190,7 @@ function render() {
       state.tenantId = picker.value ? Number(picker.value) : null;
       state.view = state.tenantId ? 'overview' : 'tenants';
       await loadEnabledModules();
+      await loadBranding(state.tenantId);
       render();
     });
   }

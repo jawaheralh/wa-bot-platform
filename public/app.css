@@ -12,6 +12,8 @@
   --deep: #3b2229;
   --deep-soft: #4a2c34;
   --accent: #c9772b;
+  /* لون النص فوق اللون الأساسي — يقلبه لونُ المنشأة إن كان فاتحاً */
+  --accent-ink: #ffffff;
   --accent-dark: #a95f1d;
   --accent-soft: #f7efe8;
   --ink: #2c1b20;
@@ -65,8 +67,15 @@ button { font-family: inherit; font-size: inherit; }
   gap: 4px;
 }
 /* نفس علامة الصفحة الرئيسية — تعريف الهوية بلا صورة تُحمَّل */
-.sidebar h1 { font-size: 17px; margin: 0 0 4px; font-weight: 600; }
-.sidebar h1::before { content: '💬 '; }
+.sidebar h1 { font-size: 17px; margin: 0 0 4px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.sidebar h1::before { content: '💬'; }
+/* شعار المنشأة يحلّ محلّ علامة المنصة، لا يُضاف إليها */
+.sidebar h1.has-logo::before { content: none; }
+.brand-logo {
+  width: 30px; height: 30px; border-radius: 7px; object-fit: contain;
+  /* خلفية بيضاء تحت الشعار: أكثر الشعارات داكن على شفافية، ويختفي على الشريط */
+  background: #fff; padding: 2px; flex: 0 0 auto;
+}
 .sidebar .who { font-size: 13px; opacity: 0.72; margin-bottom: 16px; }
 .sidebar nav { display: flex; flex-direction: column; gap: 2px; }
 .sidebar nav button {
@@ -74,7 +83,7 @@ button { font-family: inherit; font-size: inherit; }
   padding: 9px 12px; border-radius: 999px; cursor: pointer; opacity: 0.82;
 }
 .sidebar nav button:hover { background: rgba(255, 255, 255, 0.12); opacity: 1; }
-.sidebar nav button.active { background: var(--accent); opacity: 1; font-weight: 600; }
+.sidebar nav button.active { background: var(--accent); color: var(--accent-ink); opacity: 1; font-weight: 600; }
 .sidebar .spacer { flex: 1; }
 .sidebar select {
   width: 100%; padding: 8px; border-radius: 8px; border: 0;
@@ -109,7 +118,7 @@ tbody tr:hover { background: #fdfaf8; }
 /* --- الأزرار --- */
 /* كبسولة كأزرار الصفحة الرئيسية، بحشو أضيق يناسب الكثافة */
 .btn {
-  background: var(--accent); color: #fff; border: 0; border-radius: 999px;
+  background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 999px;
   padding: 8px 16px; cursor: pointer; font-weight: 600;
 }
 .btn:hover { background: var(--accent-dark); }
@@ -239,6 +248,53 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 /* الموظف بلون ثالث: التمييز بين رد البوت ورد الإنسان أهم من الجمال */
 .bubble.bot .meta { color: rgba(255, 255, 255, 0.7); }
 .bubble.staff { align-self: flex-end; background: var(--accent-soft); border: 1px solid #e8d6c4; border-start-end-radius: 4px; }
+
+/* --- شاشة الهوية --- */
+
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.swatch {
+  width: 34px; height: 34px; border-radius: 9px; cursor: pointer;
+  border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line);
+}
+.swatch:hover { transform: scale(1.08); }
+
+/* المربّع الملوّن والنص جنباً إلى جنب: أحدهما للاختيار والآخر للّصق */
+.color-pick { display: flex; gap: 8px; align-items: center; }
+.color-pick input[type='color'] {
+  width: 42px; height: 38px; padding: 2px; flex: 0 0 auto;
+  border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer;
+}
+.color-pick input[type='text'], .color-pick input:not([type]) { direction: ltr; text-align: left; }
+
+label.inline { display: flex; gap: 8px; align-items: center; margin: 14px 0 0; font-size: 14px; color: var(--ink); }
+label.inline input { width: auto; }
+
+.logo-box {
+  display: grid; place-items: center; min-height: 110px;
+  border: 1px dashed var(--line); border-radius: var(--radius);
+  /* رقعة شطرنج خفيفة: الشعار الشفاف يُرى حدّه بدل أن يذوب في البياض */
+  background:
+    linear-gradient(45deg, #f1eae6 25%, transparent 25%, transparent 75%, #f1eae6 75%),
+    linear-gradient(45deg, #f1eae6 25%, #fff 25%, #fff 75%, #f1eae6 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+}
+.logo-box img { max-width: 180px; max-height: 90px; object-fit: contain; }
+
+/* معاينة مصغّرة للوحة نفسها — لا صورة ثابتة تكذب بعد أول تعديل */
+.preview { display: flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.preview-side { flex: 0 0 170px; background: var(--deep); color: #fff; padding: 12px 10px; }
+.preview-brand { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 12px; }
+.preview-brand img { width: 26px; height: 26px; border-radius: 6px; background: #fff; padding: 2px; object-fit: contain; }
+.preview-nav { display: block; padding: 7px 10px; border-radius: 999px; font-size: 13px; opacity: .8; }
+.preview-nav.on { background: var(--accent); color: var(--accent-ink); opacity: 1; font-weight: 600; }
+.preview-main { flex: 1; padding: 14px; background: var(--bg); display: flex; flex-direction: column; gap: 8px; }
+.preview-main .bubble { max-width: 70%; }
+
+@media (max-width: 760px) {
+  .preview { flex-direction: column; }
+  .preview-side { flex: none; }
+}
 
 /* --- متفرقات --- */
 .empty { color: var(--muted); text-align: center; padding: 30px; }

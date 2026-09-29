@@ -36,6 +36,7 @@ import { listHandoffs, resolveHandoffs } from '../../modules/handoff.ts';
 import type { AppConfig } from '../../config.ts';
 import type { WhatsAppProvider } from '../../whatsapp/provider.ts';
 import { SQL_NOW } from '../../time.ts';
+import { readBranding, saveColors, storeLogo, removeLogo, readLogo, paletteFor } from '../../branding.ts';
 
 interface Params {
   tenantId: string;
@@ -665,6 +666,93 @@ export function registerTenantRoutes(
       ip: request.ip,
     });
     return result;
+  });
+
+  /* ---------------------------------------------------------------
+     الهوية: اللون والشعار
+  --------------------------------------------------------------- */
+
+  /**
+   * القراءة لكل من في المنشأة لا للمالك وحده.
+   *
+   * اللوحة تلبس الهوية عند كل إقلاع، فلو كانت القراءة للمالك لرآها
+   * وحده ورأى الموظفون ألوان المنصة — وهم من يفتح الشاشة طول اليوم.
+   */
+  app.get('/api/tenants/:tenantId/branding', async (request) => {
+    const id = tenantOf(request);
+    const branding = readBranding(db, id);
+    // الاسم معها: مالك المنشأة لا يملك قائمة المنشآت ليقرأ اسمه منها.
+    return {
+      ...branding,
+      name: getTenant(db, id)?.name ?? '',
+      logoUrl: branding.logo ? `/api/tenants/${id}/logo` : null,
+    };
+  });
+
+  /**
+   * معاينة بلا حفظ.
+   *
+   * الاشتقاق يجري في الخادم، فلولا هذا المسار لَلزم تكراره في
+   * الجافاسكربت — ونسختان من حسابٍ واحد تفترقان عند أول تعديل،
+   * فيرى العميل لوناً في المعاينة وآخر بعد الحفظ.
+   */
+  app.get('/api/tenants/:tenantId/branding/preview', async (request) => {
+    tenantOf(request);
+    const query = (request.query ?? {}) as { color?: string; deep?: string };
+    return paletteFor(query.color, query.deep);
+  });
+
+  app.put('/api/tenants/:tenantId/branding', async (request) => {
+    const id = adminOf(request);
+    const body = (request.body ?? {}) as { color?: unknown; deep?: unknown };
+    const branding = saveColors(db, id, body);
+
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username ?? '',
+      action: 'branding_change',
+      ip: request.ip,
+    });
+    return { ...branding, logoUrl: branding.logo ? `/api/tenants/${id}/logo` : null };
+  });
+
+  /** الحمولة base64 كملف التأسيس — الشعار كيلوبايتات لا ميجابايتات. */
+  app.post('/api/tenants/:tenantId/logo', async (request) => {
+    const id = adminOf(request);
+    const body = (request.body ?? {}) as { file?: string };
+    if (!body.file) throw Object.assign(new Error('لم يصل أي ملف.'), { statusCode: 400 });
+
+    const stored = storeLogo(db, config.dbPath, id, body.file);
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username ?? '',
+      action: 'branding_change',
+      ip: request.ip,
+    });
+    return { ok: true, logoUrl: `/api/tenants/${id}/logo`, bytes: stored.bytes };
+  });
+
+  app.delete('/api/tenants/:tenantId/logo', async (request) => {
+    const id = adminOf(request);
+    removeLogo(db, config.dbPath, id);
+    return { ok: true };
+  });
+
+  app.get('/api/tenants/:tenantId/logo', async (request, reply) => {
+    const id = tenantOf(request);
+    const { logo } = readBranding(db, id);
+    if (!logo) throw Object.assign(new Error('لا شعار لهذه المنشأة.'), { statusCode: 404 });
+
+    const file = readLogo(config.dbPath, logo);
+    if (!file) throw Object.assign(new Error('الشعار غير موجود.'), { statusCode: 404 });
+
+    return reply
+      .header('content-type', file.mime)
+      // الشعار يتغيّر نادراً، لكنه إن تغيّر وجب أن يُرى فوراً.
+      .header('cache-control', 'private, max-age=60')
+      .send(file.body);
   });
 
   /* ---------------------------------------------------------------

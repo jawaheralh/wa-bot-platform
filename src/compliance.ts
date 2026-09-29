@@ -51,6 +51,7 @@ export const ACTION_AR: Record<string, string> = {
   bot_toggle: 'إيقاف/تشغيل البوت',
   kb_change: 'تعديل قاعدة المعرفة',
   module_config: 'تعديل إعدادات وحدة',
+  branding_change: 'تعديل هوية المنشأة',
   staff_change: 'تعديل موظف',
   password_changed: 'تغيير كلمة المرور',
   totp_enabled: 'تفعيل التحقق بخطوتين',

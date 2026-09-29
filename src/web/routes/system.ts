@@ -65,6 +65,7 @@ export function registerSystemRoutes(
       tone: body.tone === 'formal' ? 'formal' : 'friendly',
       staffWaNumber: body.staffWaNumber,
       notes: body.notes,
+      brandColor: body.brandColor,
       admin:
         body.adminUsername && body.adminPassword
           ? { username: body.adminUsername, password: body.adminPassword, displayName: body.name }

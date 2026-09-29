@@ -209,6 +209,10 @@ export const CORE_COLUMNS: [table: string, column: string, definition: string][]
   ['users', 'totp_enabled', 'INTEGER NOT NULL DEFAULT 0'],
   ['users', 'totp_last_counter', 'INTEGER'],
   ['users', 'recovery_hashes', 'TEXT'],
+  // هوية المنشأة: لونها وشعارها. الفارغ يعني ألوان المنصة.
+  ['tenants', 'brand_color', 'TEXT'],
+  ['tenants', 'brand_deep', 'TEXT'],
+  ['tenants', 'brand_logo', 'TEXT'],
   ['conversations', 'contact_phone', 'TEXT'],
   ['conversations', 'customer_city', 'TEXT'],
   ['conversations', 'intake_done', 'INTEGER NOT NULL DEFAULT 0'],

@@ -8,6 +8,7 @@
 import bcrypt from 'bcryptjs';
 import { normalizeNumber, type Db, type TenantRow, type UserRow } from './db/index.ts';
 import { ensureTenantModules } from './modules/registry.ts';
+import { normalizeHex } from './branding.ts';
 
 export const BCRYPT_ROUNDS = 10;
 
@@ -18,6 +19,8 @@ export interface NewTenantInput {
   tone?: 'formal' | 'friendly';
   staffWaNumber?: string;
   notes?: string;
+  /** لون علامة العميل — تُشتق منه بقية اللوحة. */
+  brandColor?: string;
   admin?: { username: string; password: string; displayName?: string };
 }
 
@@ -45,8 +48,8 @@ export function createTenant(db: Db, input: NewTenantInput): TenantRow {
   const run = db.transaction(() => {
     const info = db
       .prepare(
-        `INSERT INTO tenants (name, wa_number, wa_phone_number_id, tone, staff_wa_number, notes)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO tenants (name, wa_number, wa_phone_number_id, tone, staff_wa_number, notes, brand_color)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         name,
@@ -55,6 +58,8 @@ export function createTenant(db: Db, input: NewTenantInput): TenantRow {
         input.tone ?? 'friendly',
         input.staffWaNumber ? normalizeNumber(input.staffWaNumber) : null,
         input.notes ?? null,
+        // لونٌ غير صالح لا يمنع إنشاء المنشأة — تُنشأ بألوان المنصة ويُصحَّح لاحقاً.
+        normalizeHex(input.brandColor),
       );
     const tenantId = Number(info.lastInsertRowid);
 
