@@ -130,6 +130,11 @@ export interface UserRow {
   role: 'system' | 'tenant' | 'agent';
   wa_number: string | null;
   active: number;
+  totp_secret: string | null;
+  totp_enabled: number;
+  totp_last_counter: number | null;
+  /** رموز الاسترجاع مُجزّأة، JSON من مصفوفة نصوص. */
+  recovery_hashes: string | null;
   created_at: string;
 }
 

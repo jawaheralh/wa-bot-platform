@@ -161,3 +161,26 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--green); out
   .sidebar { width: 100%; flex: none; }
   main { padding: 16px; }
 }
+
+/* --- التحقق بخطوتين --- */
+
+/* السرّ ورموز الاسترجاع: خط ثابت العرض حتى لا يلتبس 0 بـO ولا 1 بـl. */
+.secret {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 15px;
+  letter-spacing: 1px;
+  line-height: 1.9;
+  background: var(--bg-soft, #f4f6f8);
+  border: 1px solid var(--line, #dde3e8);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 10px 0;
+  user-select: all;
+  word-break: break-all;
+}
+
+.steps { margin: 0 0 14px; padding-inline-start: 20px; line-height: 2 }
+.steps li { margin-bottom: 6px }
+
+.btn.ghost { background: transparent; color: var(--ink, #223); border: 1px solid var(--line, #dde3e8) }
+.btn.danger { background: var(--danger, #c2410c) }

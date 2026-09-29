@@ -52,6 +52,48 @@ export function setSession(reply: FastifyReply, user: UserRow, secure: boolean):
 
 export function clearSession(reply: FastifyReply): void {
   reply.clearCookie(COOKIE, { path: '/' });
+  reply.clearCookie(PENDING, { path: '/' });
+}
+
+/* ---------------------------------------------------------------
+   الخطوة الوسطى: كلمة المرور صحّت ويبقى رمز التحقق
+--------------------------------------------------------------- */
+
+/**
+ * كوكي منفصلة قصيرة العمر لا تمنح أي صلاحية.
+ *
+ * الفصل عن كوكي الجلسة هو الأساس: لو حملت الجلسة نفسها راية «ينقصه
+ * التحقق» لكفى خطأ واحد في حارس لاحق ليصير نصف الدخول دخولاً كاملاً.
+ * هذه الكوكي لا يقرأها readSession إطلاقاً، فلا تفتح باباً.
+ */
+const PENDING = 'wabot_pending';
+const PENDING_SECONDS = 5 * 60;
+
+export function setPending(reply: FastifyReply, user: UserRow, secure: boolean): void {
+  reply.setCookie(PENDING, String(user.id), {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure,
+    signed: true,
+    maxAge: PENDING_SECONDS,
+  });
+}
+
+export function readPending(db: Db, request: FastifyRequest): UserRow | undefined {
+  const raw = request.cookies[PENDING];
+  if (!raw) return undefined;
+  const unsigned = request.unsignCookie(raw);
+  if (!unsigned.valid || !unsigned.value) return undefined;
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(Number(unsigned.value)) as
+    | UserRow
+    | undefined;
+  if (!user || user.active === 0) return undefined;
+  return user;
+}
+
+export function clearPending(reply: FastifyReply): void {
+  reply.clearCookie(PENDING, { path: '/' });
 }
 
 export function readSession(db: Db, request: FastifyRequest): SessionUser | undefined {
@@ -81,7 +123,12 @@ export function login(db: Db, username: string, password: string): UserRow {
 
 /** يُركّب الحارس على كل مسارات /api عدا الدخول والفحص. */
 export function registerAuthGuard(app: FastifyInstance, db: Db): void {
-  const open = new Set(['/api/login', '/api/health']);
+  /**
+   * خطوة رمز التحقق مفتوحة بالضرورة: صاحبها لم يحصل على جلسة بعد.
+   * ترتيب التسجيل لا يُغني — خطاف preHandler يسري على كل المسارات
+   * في هذا السياق مهما سُجّلت قبله.
+   */
+  const open = new Set(['/api/login', '/api/login/totp', '/api/health']);
 
   app.addHook('preHandler', async (request, reply) => {
     if (!request.url.startsWith('/api/')) return;

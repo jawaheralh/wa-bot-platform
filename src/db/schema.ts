@@ -177,6 +177,12 @@ export const CORE_TABLES: string[] = [
 export const CORE_COLUMNS: [table: string, column: string, definition: string][] = [
   ['users', 'wa_number', 'TEXT'],
   ['users', 'active', 'INTEGER NOT NULL DEFAULT 1'],
+  // التحقق بخطوتين: السرّ يبقى محفوظاً بعد التعطيل ليعاد التفعيل بلا
+  // إعداد جديد، والراية وحدها هي التي تقرّر.
+  ['users', 'totp_secret', 'TEXT'],
+  ['users', 'totp_enabled', 'INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'totp_last_counter', 'INTEGER'],
+  ['users', 'recovery_hashes', 'TEXT'],
   ['conversations', 'contact_phone', 'TEXT'],
   ['conversations', 'customer_city', 'TEXT'],
   ['conversations', 'intake_done', 'INTEGER NOT NULL DEFAULT 0'],

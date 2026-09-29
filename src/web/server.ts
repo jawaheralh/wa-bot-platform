@@ -21,7 +21,17 @@ import {
   checkLoginRate,
   recordLoginFailure,
   clearLoginFailures,
+  setPending,
+  readPending,
+  clearPending,
 } from './auth.ts';
+import {
+  startSetup,
+  confirmSetup,
+  verifyLogin,
+  disable as disableTwoFactor,
+  status as twoFactorStatus,
+} from '../two-factor.ts';
 import { registerSystemRoutes } from './routes/system.ts';
 import { registerTenantRoutes } from './routes/tenant.ts';
 import { MODULES } from '../modules/registry.ts';
@@ -140,6 +150,14 @@ export async function createServer(app: App): Promise<FastifyInstance> {
     }
 
     clearLoginFailures(key);
+
+    // التحقق بخطوتين: كلمة المرور وحدها لا تفتح الجلسة.
+    if (user.totp_enabled === 1) {
+      setPending(reply, user, request.protocol === 'https');
+      logger.info('كلمة المرور صحّت — بانتظار رمز التحقق', { مستخدم: user.username });
+      return { needTotp: true };
+    }
+
     setSession(reply, user, request.protocol === 'https');
     logger.info('تسجيل دخول', { مستخدم: user.username, دور: user.role });
     audit(db, {
@@ -150,6 +168,56 @@ export async function createServer(app: App): Promise<FastifyInstance> {
       ip: key,
     });
     return { username: user.username, displayName: user.display_name, role: user.role, tenantId: user.tenant_id };
+  });
+
+  /**
+   * الخطوة الثانية من الدخول.
+   *
+   * قبل حارس المصادقة لأن صاحبها لا يملك جلسة بعد — يملك فقط كوكي
+   * «ينقصه التحقق» التي لا تمنح أي صلاحية.
+   */
+  server.post('/api/login/totp', async (request, reply) => {
+    const pending = readPending(db, request);
+    if (!pending) {
+      throw Object.assign(new Error('انتهت مهلة الدخول. سجّلي الدخول من جديد.'), { statusCode: 401 });
+    }
+
+    const key = `totp:${request.ip}`;
+    checkLoginRate(key);
+
+    const body = (request.body ?? {}) as { code?: string };
+    try {
+      verifyLogin(db, pending, String(body.code ?? ''));
+    } catch (error) {
+      recordLoginFailure(key);
+      logger.warn('رمز تحقق خاطئ', { مستخدم: pending.username, مصدر: request.ip });
+      audit(db, {
+        tenantId: pending.tenant_id,
+        userId: pending.id,
+        username: pending.username,
+        action: 'totp_failed',
+        ip: request.ip,
+      });
+      throw error;
+    }
+
+    clearLoginFailures(key);
+    clearPending(reply);
+    setSession(reply, pending, request.protocol === 'https');
+    logger.info('تسجيل دخول بخطوتين', { مستخدم: pending.username, دور: pending.role });
+    audit(db, {
+      tenantId: pending.tenant_id,
+      userId: pending.id,
+      username: pending.username,
+      action: 'login',
+      ip: request.ip,
+    });
+    return {
+      username: pending.username,
+      displayName: pending.display_name,
+      role: pending.role,
+      tenantId: pending.tenant_id,
+    };
   });
 
   server.post('/api/logout', async (_request, reply) => {
@@ -163,6 +231,64 @@ export async function createServer(app: App): Promise<FastifyInstance> {
     const user = readSession(db, request);
     if (!user) throw Object.assign(new Error('يلزم تسجيل الدخول.'), { statusCode: 401 });
     return user;
+  });
+
+  /* --- التحقق بخطوتين: كلٌّ يديره لنفسه --- */
+
+  server.get('/api/me/2fa', async (request) => {
+    const session = readSession(db, request);
+    if (!session) throw Object.assign(new Error('يلزم تسجيل الدخول.'), { statusCode: 401 });
+    return twoFactorStatus(db, session.id);
+  });
+
+  server.post('/api/me/2fa/start', async (request) => {
+    const session = readSession(db, request);
+    if (!session) throw Object.assign(new Error('يلزم تسجيل الدخول.'), { statusCode: 401 });
+    return startSetup(db, session.id);
+  });
+
+  server.post('/api/me/2fa/confirm', async (request) => {
+    const session = readSession(db, request);
+    if (!session) throw Object.assign(new Error('يلزم تسجيل الدخول.'), { statusCode: 401 });
+
+    const body = (request.body ?? {}) as { code?: string };
+    const codes = confirmSetup(db, session.id, String(body.code ?? ''));
+    logger.info('فُعّل التحقق بخطوتين', { مستخدم: session.username });
+    audit(db, {
+      tenantId: session.tenantId,
+      userId: session.id,
+      username: session.username,
+      action: 'totp_enabled',
+      ip: request.ip,
+    });
+    // تُعرض مرة واحدة ولا تُحفظ عندنا إلا مُجزّأة.
+    return { recoveryCodes: codes };
+  });
+
+  server.post('/api/me/2fa/disable', async (request) => {
+    const session = readSession(db, request);
+    if (!session) throw Object.assign(new Error('يلزم تسجيل الدخول.'), { statusCode: 401 });
+
+    const key = `2fa-off:${request.ip}`;
+    checkLoginRate(key);
+    const body = (request.body ?? {}) as { password?: string };
+    try {
+      disableTwoFactor(db, session.id, String(body.password ?? ''));
+    } catch (error) {
+      recordLoginFailure(key);
+      throw error;
+    }
+    clearLoginFailures(key);
+
+    logger.warn('عُطّل التحقق بخطوتين', { مستخدم: session.username });
+    audit(db, {
+      tenantId: session.tenantId,
+      userId: session.id,
+      username: session.username,
+      action: 'totp_disabled',
+      ip: request.ip,
+    });
+    return { ok: true };
   });
 
   /**
