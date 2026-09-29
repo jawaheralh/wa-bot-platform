@@ -55,6 +55,7 @@ export function fakeConversation(tenantId: number): ConversationRow {
     tenant_id: tenantId,
     customer_wa: '966555555555',
     customer_name: 'عميل',
+    is_test: 0,
     bot_enabled: 1,
     silent_until: null,
     handoff_reason: null,

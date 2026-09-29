@@ -154,6 +154,9 @@ async function openThread(conversationId, main, staff) {
       <div class="actions">
         <button class="btn" id="send">إرسال</button>
         <button class="btn ghost" id="toggle">${conversation.bot_enabled ? 'إيقاف البوت' : 'تشغيل البوت'}</button>
+        <button class="btn ghost" id="markTest" title="الموسوم وحده يُحذف بزر «حذف بيانات التجربة»">
+          ${conversation.is_test ? '✓ موسومة تجريبية' : 'وسم كتجربة'}
+        </button>
       </div>
     </div>
   `;
@@ -185,6 +188,20 @@ async function openThread(conversationId, main, staff) {
       enabled: !conversation.bot_enabled,
     });
     flash(conversation.bot_enabled ? 'أُوقف البوت لهذه المحادثة.' : 'عاد البوت للعمل.');
+    await renderConversations(main);
+    await openThread(conversationId, main, staff);
+  });
+
+  /**
+   * الوسم يدوي لا مخمَّن.
+   *
+   * لا يحذف شيئاً بنفسه — يجعل المحادثة مؤهّلة للحذف بزر الأدمن.
+   * الفصل بين الوسم والحذف مقصود: خطوتان لفعلٍ لا يُسترجع.
+   */
+  document.getElementById('markTest').onclick = guard(async () => {
+    const next = !conversation.is_test;
+    await post(`/api/tenants/${state.tenantId}/conversations/${conversationId}/test`, { isTest: next });
+    flash(next ? 'وُسمت كتجربة — صارت قابلة للحذف من الإعداد.' : 'رُفع الوسم — لم تعد تُحذف.');
     await renderConversations(main);
     await openThread(conversationId, main, staff);
   });

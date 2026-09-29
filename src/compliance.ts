@@ -56,6 +56,8 @@ export const ACTION_AR: Record<string, string> = {
   totp_enabled: 'تفعيل التحقق بخطوتين',
   totp_disabled: 'تعطيل التحقق بخطوتين',
   totp_failed: 'رمز تحقق خاطئ',
+  purge_test_data: 'حذف بيانات التجربة',
+  mark_test: 'وسم محادثة كتجربة',
   delete_customer: 'حذف بيانات عميل',
   retention_purge: 'حذف تلقائي بانتهاء مدة الاحتفاظ',
   export_customer: 'تصدير بيانات عميل',

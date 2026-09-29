@@ -218,6 +218,31 @@ export function registerTenantRoutes(
   });
 
   /** إيقاف أو تشغيل البوت لمحادثة بعينها. */
+  /**
+   * وسم المحادثة كتجربة — أو رفع الوسم.
+   *
+   * الوسم هو الشرط الوحيد لحذفها لاحقاً بزر «حذف بيانات التجربة».
+   * جعله يدوياً مقصود: تخمين النظام «هذه تبدو تجريبية» يخطئ يوماً على
+   * عميل حقيقي، والحذف لا يُسترجع.
+   */
+  app.post('/api/tenants/:tenantId/conversations/:conversationId/test', async (request) => {
+    const id = tenantOf(request);
+    const conversationId = Number((request.params as Params & { conversationId: string }).conversationId);
+    const isTest = (request.body as { isTest?: boolean })?.isTest === true;
+
+    const { markConversation } = await import('../../test-data.ts');
+    markConversation(db, id, conversationId, isTest);
+
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username ?? '',
+      action: 'mark_test',
+      ip: request.ip,
+    });
+    return getConversation(db, conversationId);
+  });
+
   app.post('/api/tenants/:tenantId/conversations/:conversationId/bot', async (request) => {
     const id = tenantOf(request);
     const conversationId = Number((request.params as Params & { conversationId: string }).conversationId);

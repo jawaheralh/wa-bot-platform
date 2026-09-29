@@ -15,6 +15,7 @@ import { readEnvFile, writeEnvFile, maskSecret } from '../../env-file.ts';
 import { usageThisMonth, usageFor, forgetClaudeCache, estimateInputCost } from '../../tenant-claude.ts';
 import { randomBytes } from 'node:crypto';
 import type { WhatsAppProvider } from '../../whatsapp/provider.ts';
+import { audit } from '../../compliance.ts';
 
 export function registerSystemRoutes(
   app: FastifyInstance,
@@ -385,6 +386,43 @@ export function registerSystemRoutes(
       );
     }
     return meta.configureWebhook({ ...config, cloud: { ...config.cloud, ...credentials } });
+  });
+
+  /* ---------------------------------------------------------------
+     بيانات التجربة — الحذف الوحيد المسموح في النظام
+  --------------------------------------------------------------- */
+
+  /**
+   * ما سيُحذف، قبل الحذف.
+   *
+   * لا يُحذف شيء بلا أن يُرى أولاً: زر حذف لا يُظهر ما يمسّه يُضغط
+   * يوماً على بيانات لم يقصدها صاحبه.
+   */
+  app.get('/api/system/test-data', async (request) => {
+    requireSystemAdmin(request);
+    const { summarizeTestData } = await import('../../test-data.ts');
+    return summarizeTestData(db);
+  });
+
+  /**
+   * الحذف — للموسوم تجريبياً وحده.
+   *
+   * ولا يوجد في النظام أي مسار آخر يحذف محادثة أو طلباً. ما لا يحمل
+   * الوسم لا سبيل لحذفه من اللوحة إطلاقاً، وهذا قيد مقصود.
+   */
+  app.delete('/api/system/test-data', async (request) => {
+    requireSystemAdmin(request);
+    const { deleteTestData } = await import('../../test-data.ts');
+    const removed = deleteTestData(db);
+
+    audit(db, {
+      tenantId: null,
+      userId: request.user?.id,
+      username: request.user?.username ?? '',
+      action: 'purge_test_data',
+      ip: request.ip,
+    });
+    return removed;
   });
 
   app.post('/api/system/meta/configure-webhook', async (request) => {

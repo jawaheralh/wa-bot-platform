@@ -102,6 +102,8 @@ export interface ConversationRow {
   assigned_at: string | null;
   viewing_user_id: number | null;
   viewing_at: string | null;
+  /** ١ = محادثة تجربة، يجوز حذفها من زر «حذف بيانات التجربة». */
+  is_test: number;
   last_message_at: string | null;
   created_at: string;
 }

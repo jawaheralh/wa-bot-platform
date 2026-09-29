@@ -5,7 +5,7 @@
  * وجود قيمة في الملف لا يعني أنها صحيحة.
  */
 
-import { get, put, post, esc, guard, flash } from '../core.js';
+import { get, put, post, del, esc, guard, flash } from '../core.js';
 
 const HINTS = {
   WA_PROVIDER: 'cloud = الرسمي · baileys = مسح QR برقم ثانوي · simulator = بلا اتصال',
@@ -25,10 +25,11 @@ const HINTS = {
 export async function renderSetup(main) {
   main.innerHTML = '<h2>الإعداد</h2><div class="empty">جارٍ فحص الربط مع Meta…</div>';
 
-  const [settings, status, health] = await Promise.all([
+  const [settings, status, health, testData] = await Promise.all([
     get('/api/system/settings'),
     get('/api/system/meta/status').catch((e) => ({ error: e.message, checks: [], numbers: [] })),
     get('/api/system/health').catch(() => ({ checks: [], severity: 'warn', history: [] })),
+    get('/api/system/test-data').catch(() => ({ conversations: 0, messages: 0, requests: 0, complaints: 0, bookings: 0, preview: [] })),
   ]);
 
   const BADGE = { ok: 'green', warn: 'amber', down: 'red' };
@@ -119,6 +120,8 @@ export async function renderSetup(main) {
       </p>
     </div>
 
+    ${testDataCard(testData)}
+
     <div class="card">
       <h3>الإعدادات المشتركة</h3>
       <p class="muted" style="margin-top:0">
@@ -196,4 +199,78 @@ export async function renderSetup(main) {
     document.getElementById('restartNote').hidden = false;
     document.getElementById('restartNote').scrollIntoView({ behavior: 'smooth' });
   });
+
+  const purge = document.getElementById('purgeTest');
+  if (purge) {
+    purge.onclick = guard(async () => {
+      const total = testData.conversations;
+      // تأكيد يذكر العدد لا «متأكدة؟» مجرّدة: الرقم يجعل الضغطة واعية.
+      if (
+        !confirm(
+          `حذف ${total} محادثة تجريبية و${testData.messages} رسالة و${testData.requests} طلباً.\n` +
+            'لا يمكن التراجع. المحادثات غير الموسومة لن تُمَسّ.\n\nأتابع؟',
+        )
+      ) {
+        return;
+      }
+      const removed = await del('/api/system/test-data');
+      flash(`حُذفت ${removed.conversations} محادثة تجريبية.`);
+      await renderSetup(main);
+    });
+  }
+}
+
+/* ---------------------------------------------------------------
+   بيانات التجربة
+--------------------------------------------------------------- */
+
+/**
+ * الزر يعرض ما سيحذفه قبل أن يحذفه.
+ *
+ * زر حذف لا يُظهر ما يمسّه يُضغط يوماً على بيانات لم يقصدها صاحبه —
+ * ولا سبيل للتراجع.
+ */
+function testDataCard(data) {
+  if (!data.conversations) {
+    return `
+      <div class="card">
+        <h3>بيانات التجربة</h3>
+        <p class="muted" style="margin:0">
+          لا توجد محادثات موسومة كتجربة. لوسم محادثة افتحيها من
+          <strong>المحادثات</strong> واضغطي «تجريبية».
+        </p>
+      </div>`;
+  }
+
+  return `
+    <div class="card" style="border-inline-start:3px solid var(--warn)">
+      <h3>بيانات التجربة</h3>
+      <p class="muted" style="margin-top:0">
+        هذه المحادثات وُسمت تجريبية. <strong>الحذف يطالها وحدها</strong> —
+        ولا يملك النظام أي مسار لحذف غيرها.
+      </p>
+
+      <div class="table-wrap"><table><tbody>
+        ${data.preview
+          .map(
+            (c) => `<tr>
+              <td style="width:170px">${esc(c.customerWa)}</td>
+              <td style="width:150px">${esc(c.customerName ?? '—')}</td>
+              <td style="width:110px" class="muted">${c.messages} رسالة</td>
+              <td class="muted">${esc(c.tenant)}</td>
+            </tr>`,
+          )
+          .join('')}
+      </tbody></table></div>
+
+      <p class="muted" style="margin-top:10px">
+        الإجمالي: <strong>${data.conversations}</strong> محادثة ·
+        ${data.messages} رسالة · ${data.requests} طلباً ·
+        ${data.complaints} شكوى · ${data.bookings} حجزاً
+      </p>
+
+      <div class="actions">
+        <button class="btn danger" id="purgeTest">احذفي بيانات التجربة</button>
+      </div>
+    </div>`;
 }

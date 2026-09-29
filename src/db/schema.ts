@@ -190,6 +190,8 @@ export const CORE_COLUMNS: [table: string, column: string, definition: string][]
   ['conversations', 'assigned_at', 'TEXT'],
   ['conversations', 'viewing_user_id', 'INTEGER'],
   ['conversations', 'viewing_at', 'TEXT'],
+  // وسم التجربة: هو وحده ما يجيز الحذف. محادثة بلا وسم لا تُحذف أبداً.
+  ['conversations', 'is_test', 'INTEGER NOT NULL DEFAULT 0'],
   ['messages', 'user_id', 'INTEGER'],
   ['messages', 'media_path', 'TEXT'],
   ['messages', 'media_name', 'TEXT'],
