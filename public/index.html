@@ -3,26 +3,193 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>لوحة التحكم — منصة بوت واتساب</title>
-  <link rel="stylesheet" href="/app.css">
+  <title>منصة خدمة عملاء على واتساب</title>
+  <meta name="description" content="صندوق وارد موحّد لمحادثات واتساب، مع ردود ذكية وشكاوى وطلبات بأرقام مرجعية.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>💬</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Amiri:ital@1&family=Playfair+Display:ital@1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/landing.css">
 </head>
 <body>
-  <div id="root">
-    <div class="empty" id="boot">جارٍ التحميل…</div>
-  </div>
 
-  <script type="module" src="/js/app.js"></script>
-  <script>
-    // حارس الإقلاع: لو فشل تحميل الوحدات نُظهر السبب بدل تعليق الصفحة.
-    setTimeout(() => {
-      const boot = document.getElementById('boot');
-      if (boot && boot.isConnected) {
-        boot.innerHTML =
-          '<div class="error">تعذّر إقلاع الواجهة. تأكدي أن الخادم يعمل، ثم أعيدي التحميل.</div>' +
-          '<button class="btn" onclick="location.reload()">إعادة المحاولة</button>';
-      }
-    }, 10000);
-  </script>
+<header class="bar">
+  <div class="wrap bar-inner">
+    <a class="brand" href="/">
+      <span class="mark">💬</span>
+      <strong data-t="brand"></strong>
+    </a>
+    <nav class="bar-actions">
+      <button class="ghost" id="lang" type="button">English</button>
+      <a class="ghost" href="/login.html" data-t="login"></a>
+      <a class="solid" href="#demo" data-t="cta"></a>
+    </nav>
+  </div>
+</header>
+
+<!-- البطل -->
+<section class="hero">
+  <div class="wrap hero-grid">
+
+    <div class="hero-text">
+      <h1 data-t="h1"></h1>
+      <p class="lead" data-t="lead"></p>
+
+      <ul class="ticks">
+        <li data-t="tick1"></li>
+        <li data-t="tick2"></li>
+        <li data-t="tick3"></li>
+      </ul>
+
+      <!-- نموذج مصغّر للوحة: يُبنى بالـHTML لا بصورة، فيبقى حاداً ويترجَم -->
+      <div class="mock" aria-hidden="true">
+        <div class="mock-top"><span></span><span></span><span></span></div>
+        <div class="mock-body">
+          <div class="mock-list">
+            <div class="mock-row active"><b>خالد</b><i>المضخة معطلة…</i></div>
+            <div class="mock-row"><b>نورة</b><i>متى تفتحون؟</i></div>
+            <div class="mock-row"><b>فهد</b><i>أبغى عرض سعر</i></div>
+          </div>
+          <div class="mock-chat">
+            <div class="bub in">المضخة رقم ٢ معطلة من أمس</div>
+            <div class="bub out">سُجّل طلبك برقم TLB-2026-000012 وبيتواصل معك المسؤول.</div>
+            <div class="bub in">تمام، شكراً</div>
+          </div>
+        </div>
+        <div class="mock-kpis">
+          <div><b>٤٢</b><span data-t="kpi1"></span></div>
+          <div><b>٩٪</b><span data-t="kpi2"></span></div>
+          <div><b>٢١ث</b><span data-t="kpi3"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- النموذج -->
+    <div class="card form-card" id="demo">
+      <p class="accent" data-t="formKicker"></p>
+      <h2 data-t="formTitle"></h2>
+      <p class="muted" data-t="formSub"></p>
+
+      <form id="demoForm" novalidate>
+        <!-- فخّ الآلات: مخفي بصرياً وعن قارئ الشاشة، ولا يملؤه إنسان -->
+        <div class="trap" aria-hidden="true">
+          <label for="website">Website</label>
+          <input id="website" name="website" tabindex="-1" autocomplete="off">
+        </div>
+
+        <div class="two">
+          <div class="field">
+            <input id="firstName" required autocomplete="given-name" placeholder=" ">
+            <label for="firstName" data-t="firstName"></label>
+          </div>
+          <div class="field">
+            <input id="lastName" autocomplete="family-name" placeholder=" ">
+            <label for="lastName" data-t="lastName"></label>
+          </div>
+        </div>
+
+        <div class="field">
+          <input id="email" type="email" required autocomplete="email" dir="ltr" placeholder=" ">
+          <label for="email" data-t="email"></label>
+        </div>
+
+        <div class="field">
+          <input id="company" required autocomplete="organization" placeholder=" ">
+          <label for="company" data-t="company"></label>
+        </div>
+
+        <div class="field">
+          <input id="phone" required autocomplete="tel" dir="ltr" value="+966" placeholder=" ">
+          <label for="phone" data-t="phone"></label>
+        </div>
+
+        <div class="two">
+          <div class="field select">
+            <select id="country"></select>
+            <label for="country" data-t="country"></label>
+          </div>
+          <div class="field select">
+            <select id="role"></select>
+            <label for="role" data-t="role"></label>
+          </div>
+        </div>
+
+        <div class="field select">
+          <select id="teamSize"></select>
+          <label for="teamSize" data-t="teamSize"></label>
+        </div>
+
+        <label class="check">
+          <input type="checkbox" id="marketingOk">
+          <span data-t="marketing"></span>
+        </label>
+
+        <p class="legal" data-t="legal"></p>
+
+        <button class="solid wide" type="submit" id="submit" data-t="submit"></button>
+        <div id="formError" class="form-error" hidden></div>
+      </form>
+
+      <div id="done" class="done" hidden>
+        <div class="done-mark">✓</div>
+        <h3 data-t="doneTitle"></h3>
+        <p class="muted" data-t="doneBody"></p>
+      </div>
+    </div>
+
+  </div>
+  <div class="hero-cut"></div>
+</section>
+
+<!-- تمهيد -->
+<section class="wrap band">
+  <h2 data-t="s2Title"></h2>
+  <p class="lead center" data-t="s2Body"></p>
+</section>
+
+<!-- المزايا -->
+<section class="wrap band">
+  <div class="cards">
+    <article class="card feature">
+      <div class="icon">📥</div>
+      <h3 data-t="f1Title"></h3>
+      <p data-t="f1Body"></p>
+    </article>
+    <article class="card feature">
+      <div class="icon">🤖</div>
+      <h3 data-t="f2Title"></h3>
+      <p data-t="f2Body"></p>
+    </article>
+    <article class="card feature">
+      <div class="icon">📊</div>
+      <h3 data-t="f3Title"></h3>
+      <p data-t="f3Body"></p>
+    </article>
+  </div>
+  <p class="soon" data-t="soon"></p>
+</section>
+
+<!-- نداء أخير -->
+<section class="wrap band center">
+  <h2 data-t="ctaTitle"></h2>
+  <p class="lead" data-t="ctaBody"></p>
+  <a class="solid" href="#demo" data-t="cta"></a>
+</section>
+
+<footer class="foot">
+  <div class="wrap foot-inner">
+    <span data-t="copy"></span>
+    <nav>
+      <a href="/login.html" data-t="login"></a>
+      <a href="#demo" data-t="cta"></a>
+    </nav>
+  </div>
+</footer>
+
+<button class="chat" id="chat" type="button" hidden>
+  <span data-t="chatLabel"></span>
+</button>
+
+<script type="module" src="/js/landing.js"></script>
 </body>
 </html>

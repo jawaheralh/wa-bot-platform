@@ -20,6 +20,7 @@ import { renderPrivacy } from './views/privacy.js';
 import { renderBookings } from './views/bookings.js';
 import { renderAccount } from './views/account.js';
 import { renderTenantSetup } from './views/tenant-setup.js';
+import { renderLeads } from './views/leads.js';
 
 const VIEWS = [
   { id: 'overview', label: 'نظرة عامة', render: renderOverview },
@@ -75,7 +76,7 @@ function visibleViews() {
  * شاشات أدمن النظام: ليست في VIEWS لأنها لا تخص منشأة بعينها.
  * إغفالها هنا جعل الحارس أدناه يُعيدها إلى «نظرة عامة» عند كل ضغطة.
  */
-const SYSTEM_VIEWS = new Set(['setup', 'tenants', 'account']);
+const SYSTEM_VIEWS = new Set(['setup', 'tenants', 'account', 'leads']);
 
 /** تغيّر وصل أثناء الكتابة فأُجّل حتى تفرغ. */
 let pendingLive = false;
@@ -125,6 +126,7 @@ function render() {
           ${
             state.me.role === 'system'
               ? `<button data-view="tenants" class="${state.view === 'tenants' ? 'active' : ''}">كل المنشآت</button>
+                 <button data-view="leads" class="${state.view === 'leads' ? 'active' : ''}">طلبات التجربة</button>
                  <button data-view="setup" class="${state.view === 'setup' ? 'active' : ''}">الإعداد</button>`
               : ''
           }
@@ -199,6 +201,12 @@ async function draw(main) {
     // يدخلها وهو لم يختر أي منشأة بعد.
     if (state.view === 'account') {
       await renderAccount(main);
+      return;
+    }
+
+    // قبل حارس «اختاري منشأة»: الطلب ليس لمنشأة بعد.
+    if (state.view === 'leads') {
+      await renderLeads(main);
       return;
     }
 

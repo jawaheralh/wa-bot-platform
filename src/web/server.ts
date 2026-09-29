@@ -77,6 +77,14 @@ export async function createServer(app: App): Promise<FastifyInstance> {
     },
   });
 
+  /**
+   * اللوحة على /app وصفحة الهبوط على /.
+   *
+   * fastify-static يخدم الملفات باسمها، و/app ليس ملفاً — فيُوجَّه
+   * صراحةً. والمسار بلا امتداد مقصود: عنوان يكتبه الموظف ويتذكّره.
+   */
+  server.get('/app', async (_request, reply) => reply.sendFile('app.html'));
+
   /* --- الأخطاء تُعاد كرسائل عربية مفهومة لا كـstack --- */
   server.setErrorHandler(async (error, request, reply) => {
     const status = (error as { statusCode?: number }).statusCode ?? 500;
@@ -131,6 +139,53 @@ export async function createServer(app: App): Promise<FastifyInstance> {
   }
 
   server.get('/api/health', async () => ({ ok: true, provider: provider.name }));
+
+  /**
+   * اسم المنصة لصفحة الهبوط — عام بلا جلسة.
+   *
+   * يُقرأ من الخادم لا يُكتب في الصفحة، فتغييره يكون في متغيّر واحد
+   * بدل تتبّعه في عشرة مواضع من HTML.
+   */
+  server.get('/api/brand', async () => ({
+    name: config.brandName,
+    supportWhatsapp: config.supportWhatsApp ?? '',
+  }));
+
+  /**
+   * طلب تجربة من صفحة الهبوط — مفتوح بلا تسجيل دخول.
+   *
+   * قبل حارس المصادقة بالضرورة: من يملؤه ليس عميلاً بعد. وحمايته
+   * بالفخّ والحدّ داخل submitDemoRequest لا هنا، فتبقى القاعدة في
+   * مكان واحد يُختبَر.
+   */
+  server.post('/api/demo-request', async (request) => {
+    const { submitDemoRequest } = await import('../demo-requests.ts');
+    const body = (request.body ?? {}) as Record<string, unknown>;
+
+    const result = submitDemoRequest(
+      db,
+      {
+        firstName: String(body.firstName ?? ''),
+        lastName: String(body.lastName ?? ''),
+        email: String(body.email ?? ''),
+        company: String(body.company ?? ''),
+        phone: String(body.phone ?? ''),
+        country: String(body.country ?? ''),
+        role: String(body.role ?? ''),
+        teamSize: String(body.teamSize ?? ''),
+        marketingOk: body.marketingOk === true,
+        lang: String(body.lang ?? 'ar'),
+        website: String(body.website ?? ''),
+      },
+      request.ip,
+    );
+
+    if (!result.trapped) {
+      logger.info('طلب تجربة جديد', { منشأة: String(body.company ?? ''), بريد: String(body.email ?? '') });
+    }
+    // الفخّ يُعامَل كالنجاح: إخبار الآلة بأنها كُشفت يجعلها تعيد المحاولة.
+    return { ok: true };
+  });
 
   /* --- الجلسة --- */
   server.post('/api/login', async (request, reply) => {

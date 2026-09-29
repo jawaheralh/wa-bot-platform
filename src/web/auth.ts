@@ -128,7 +128,7 @@ export function registerAuthGuard(app: FastifyInstance, db: Db): void {
    * ترتيب التسجيل لا يُغني — خطاف preHandler يسري على كل المسارات
    * في هذا السياق مهما سُجّلت قبله.
    */
-  const open = new Set(['/api/login', '/api/login/totp', '/api/health']);
+  const open = new Set(['/api/login', '/api/login/totp', '/api/health', '/api/brand', '/api/demo-request']);
 
   app.addHook('preHandler', async (request, reply) => {
     if (!request.url.startsWith('/api/')) return;

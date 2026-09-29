@@ -57,6 +57,8 @@ export interface AppConfig {
   redactPii: boolean;
   /** متابعة العميل تلقائياً قبل إغلاق نافذة الأربع والعشرين ساعة. */
   followup: boolean;
+  /** اسم المنصة التجاري كما يظهر في صفحة الهبوط. */
+  brandName: string;
   /** السماح للمنشأة بلا بيانات Meta خاصة أن ترث القيم العامة من .env. */
   sharedMetaFallback: boolean;
   dbPath: string;
@@ -155,6 +157,7 @@ export function loadConfig(): AppConfig {
     publicPanel: str('PUBLIC_PANEL', '0') === '1',
     redactPii: str('REDACT_PII', '1') === '1',
     followup: str('FOLLOWUP', '1') === '1',
+    brandName: str('BRAND_NAME', 'رُدود'),
     sharedMetaFallback: str('SHARED_META_FALLBACK', '0') === '1',
     dbPath: str('DB_PATH', join(ROOT, 'data', 'app.db')),
     sessionSecret,

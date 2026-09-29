@@ -79,13 +79,13 @@
             form.code.focus();
             return;
           }
-          location.href = '/';
+          location.href = '/app';
           return;
         }
 
         const { ok, data } = await send('/api/login/totp', { code: form.code.value });
         if (!ok) throw new Error(data.error || 'رمز غير صحيح.');
-        location.href = '/';
+        location.href = '/app';
       } catch (error) {
         errorBox.textContent = error.message;
         errorBox.hidden = false;

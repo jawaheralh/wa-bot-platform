@@ -104,6 +104,31 @@ export const CORE_TABLES: string[] = [
     ip         TEXT,
     created_at TEXT    NOT NULL DEFAULT (${SQL_NOW})
   )`,
+  /**
+   * طلبات التجربة من صفحة الهبوط.
+   *
+   * جدول مستقل لا صلة له بالمنشآت: من يملأ النموذج ليس عميلاً بعد،
+   * وربطه بمنشأة قبل أن يشترك يخلط المحتمَل بالقائم فتُفسد الإحصاءات.
+   */
+  `CREATE TABLE IF NOT EXISTS demo_requests (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    first_name   TEXT    NOT NULL,
+    last_name    TEXT,
+    email        TEXT    NOT NULL,
+    company      TEXT    NOT NULL,
+    phone        TEXT    NOT NULL,
+    country      TEXT,
+    role         TEXT,
+    team_size    TEXT,
+    marketing_ok INTEGER NOT NULL DEFAULT 0,
+    lang         TEXT    NOT NULL DEFAULT 'ar',
+    source_ip    TEXT,
+    status       TEXT    NOT NULL DEFAULT 'new',   -- new | contacted | done | spam
+    note         TEXT,
+    created_at   TEXT    NOT NULL DEFAULT (${SQL_NOW})
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_demo_requests_new ON demo_requests(status, id DESC)`,
+
   `CREATE INDEX IF NOT EXISTS idx_audit_tenant ON audit_log(tenant_id, id DESC)`,
 
   /* --- ثغرات المعرفة: أسئلة عجز عنها البوت مع عملاء حقيقيين --- */

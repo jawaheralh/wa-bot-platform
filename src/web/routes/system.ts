@@ -388,6 +388,23 @@ export function registerSystemRoutes(
     return meta.configureWebhook({ ...config, cloud: { ...config.cloud, ...credentials } });
   });
 
+  /* --- طلبات التجربة من صفحة الهبوط --- */
+
+  app.get('/api/system/demo-requests', async (request) => {
+    requireSystemAdmin(request);
+    const { listDemoRequests } = await import('../../demo-requests.ts');
+    return { requests: listDemoRequests(db) };
+  });
+
+  app.patch('/api/system/demo-requests/:id', async (request) => {
+    requireSystemAdmin(request);
+    const id = Number((request.params as { id: string }).id);
+    const body = (request.body ?? {}) as { status?: string; note?: string };
+    const { updateDemoRequest, listDemoRequests } = await import('../../demo-requests.ts');
+    updateDemoRequest(db, id, String(body.status ?? ''), body.note);
+    return { requests: listDemoRequests(db) };
+  });
+
   /* ---------------------------------------------------------------
      بيانات التجربة — الحذف الوحيد المسموح في النظام
   --------------------------------------------------------------- */

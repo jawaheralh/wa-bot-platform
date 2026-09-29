@@ -1,0 +1,314 @@
+/**
+ * صفحة الهبوط.
+ *
+ * منفصلة عن app.css عمداً: اللوحة أداة عمل تُفتح كل يوم، والهبوط
+ * صفحة تسويق تُفتح مرة. خلطهما يجعل تعديل ألوان التسويق يُغيّر شاشةً
+ * يعمل عليها موظف.
+ *
+ * والاتجاه بخصائص منطقية (inline-start/end) لا يمين ويسار: الصفحة
+ * تنقلب بين العربية والإنجليزية بضغطة، وبلا ذلك يلزم نسختان من كل
+ * قاعدة — وتُنسى إحداهما.
+ */
+
+:root {
+  --ink: #2c1b20;
+  --deep: #3b2229;
+  --accent: #c9772b;
+  --accent-dark: #a95f1d;
+  --line: #e6dcd8;
+  --muted: #6f625e;
+  --bg: #fffdfb;
+  --radius: 24px;
+  --shadow: 0 18px 48px rgba(59, 34, 41, 0.14);
+}
+
+* { box-sizing: border-box }
+
+html { scroll-behavior: smooth }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'IBM Plex Sans Arabic', system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.75;
+}
+
+body[dir='ltr'] { font-family: 'Inter', system-ui, sans-serif }
+
+.wrap { max-width: 1180px; margin-inline: auto; padding-inline: 24px }
+
+h1, h2, h3 { line-height: 1.25; margin: 0 0 12px }
+h1 { font-size: 56px; font-weight: 700; letter-spacing: -0.5px }
+h2 { font-size: 34px; font-weight: 700 }
+h3 { font-size: 20px; font-weight: 600 }
+p { margin: 0 0 14px }
+
+.lead { font-size: 20px; color: #4a3a36 }
+.muted { color: var(--muted); font-size: 15px }
+.center { text-align: center }
+
+/* --- الشريط العلوي --- */
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(59, 34, 41, 0.92);
+  backdrop-filter: blur(8px);
+}
+.bar-inner { display: flex; align-items: center; gap: 16px; padding-block: 14px }
+.brand { display: flex; align-items: center; gap: 10px; color: #fff; text-decoration: none; font-size: 19px }
+.mark { font-size: 22px }
+.bar-actions { display: flex; align-items: center; gap: 10px; margin-inline-start: auto }
+
+.ghost, .solid {
+  border-radius: 999px;
+  padding: 10px 18px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  border: 1px solid transparent;
+}
+.ghost { background: transparent; color: #fff; border-color: rgba(255, 255, 255, 0.35) }
+.ghost:hover { background: rgba(255, 255, 255, 0.12) }
+.solid { background: var(--accent); color: #fff }
+.solid:hover { background: var(--accent-dark) }
+.solid.wide { width: 100%; padding-block: 14px; font-size: 16px }
+
+/* --- البطل --- */
+
+.hero { position: relative; background: var(--deep); color: #fff; padding-block: 64px 140px }
+.hero h1, .hero .lead { color: #fff }
+.hero .lead { opacity: 0.88 }
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 48px;
+  align-items: start;
+  position: relative;
+  z-index: 2;
+}
+
+/**
+ * القطع المائل.
+ *
+ * يُرسم على العنصر نفسه لا على الجسم: لو وُضع على الجسم لقصّ النموذج
+ * الملتصق حين يطول في الشاشات القصيرة.
+ */
+.hero-cut {
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 120px;
+  background: var(--bg);
+  clip-path: polygon(0 55%, 100% 0, 100% 100%, 0 100%);
+}
+body[dir='ltr'] .hero-cut { clip-path: polygon(0 0, 100% 55%, 100% 100%, 0 100%) }
+
+.ticks { list-style: none; padding: 0; margin: 20px 0 28px; display: grid; gap: 8px }
+.ticks li { position: relative; padding-inline-start: 26px; opacity: 0.92 }
+.ticks li::before {
+  content: '✓';
+  position: absolute;
+  inset-inline-start: 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* --- نموذج اللوحة المصغّر --- */
+
+.mock {
+  background: #fff;
+  color: var(--ink);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  margin-top: 28px;
+}
+.mock-top { display: flex; gap: 6px; padding: 10px 14px; background: #f3edea }
+.mock-top span { width: 10px; height: 10px; border-radius: 50%; background: #d6c9c3 }
+.mock-body { display: grid; grid-template-columns: 210px 1fr; min-height: 190px }
+.mock-list { border-inline-end: 1px solid var(--line); padding: 8px }
+.mock-row { padding: 9px 10px; border-radius: 8px; font-size: 13px }
+.mock-row.active { background: #f7efe8 }
+.mock-row b { display: block; font-weight: 600 }
+.mock-row i { font-style: normal; color: var(--muted); font-size: 12px }
+.mock-chat { padding: 14px; display: grid; gap: 8px; align-content: start }
+.bub { max-width: 82%; padding: 9px 13px; border-radius: 14px; font-size: 13px; line-height: 1.6 }
+.bub.in { background: #f3edea; justify-self: start; border-start-start-radius: 4px }
+.bub.out { background: var(--deep); color: #fff; justify-self: end; border-start-end-radius: 4px }
+.mock-kpis { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line) }
+.mock-kpis div { padding: 12px; text-align: center; border-inline-end: 1px solid var(--line) }
+.mock-kpis div:last-child { border-inline-end: 0 }
+.mock-kpis b { display: block; font-size: 20px; font-weight: 700 }
+.mock-kpis span { font-size: 12px; color: var(--muted) }
+
+/* --- البطاقات --- */
+
+.card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 32px }
+.form-card { position: sticky; top: 92px }
+
+.accent {
+  font-family: 'Amiri', serif;
+  font-style: italic;
+  font-size: 26px;
+  color: var(--accent);
+  margin: 0 0 2px;
+}
+body[dir='ltr'] .accent { font-family: 'Playfair Display', serif }
+
+/* --- الحقول: خط سفلي وتسمية عائمة --- */
+
+.field { position: relative; margin-top: 26px }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px }
+
+.field input, .field select {
+  width: 100%;
+  border: 0;
+  border-bottom: 2px solid var(--line);
+  background: transparent;
+  padding: 8px 2px;
+  font: inherit;
+  font-size: 16px;
+  color: var(--ink);
+  border-radius: 0;
+}
+.field select { appearance: none; cursor: pointer }
+.field input:focus, .field select:focus { outline: none; border-bottom-color: var(--accent) }
+
+.field label {
+  position: absolute;
+  inset-inline-start: 2px;
+  top: 8px;
+  color: var(--muted);
+  font-size: 16px;
+  pointer-events: none;
+  transition: 0.15s ease;
+}
+/* التسمية ترتفع حين يُملأ الحقل أو يُركَّز عليه */
+.field input:focus + label,
+.field input:not(:placeholder-shown) + label,
+.field select:focus + label,
+.field.select label {
+  top: -14px;
+  font-size: 13px;
+  color: var(--accent);
+}
+.field.select::after {
+  content: '▾';
+  position: absolute;
+  inset-inline-end: 4px;
+  top: 8px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.field.bad input, .field.bad select { border-bottom-color: #c2410c }
+
+.check { display: flex; gap: 10px; align-items: flex-start; margin-top: 26px; font-size: 15px }
+.check input { margin-top: 5px }
+
+.legal { font-size: 13px; color: var(--muted); margin: 14px 0 18px }
+
+.form-error {
+  background: #fdecea;
+  border: 1px solid #f3c3bc;
+  color: #a02c1c;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-top: 12px;
+  font-size: 15px;
+}
+
+/* الفخّ: بعيد عن الشاشة لا display:none — الآلات تتجاهل المخفي */
+.trap { position: absolute; inset-inline-start: -9999px; width: 1px; height: 1px; overflow: hidden }
+
+.done { text-align: center; padding-block: 18px }
+.done-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #eaf6ee;
+  color: #187a3e;
+  font-size: 28px;
+  line-height: 56px;
+  margin: 0 auto 14px;
+}
+
+/* --- الأقسام --- */
+
+.band { padding-block: 64px }
+.band > h2 { text-align: center }
+.band > .lead.center { max-width: 760px; margin-inline: auto }
+
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 12px }
+.feature { padding: 28px }
+.feature .icon { font-size: 30px; margin-bottom: 10px }
+.feature p { color: var(--muted); font-size: 16px; margin: 0 }
+
+.soon {
+  text-align: center;
+  color: var(--muted);
+  font-size: 15px;
+  margin-top: 28px;
+}
+
+/* --- التذييل --- */
+
+.foot { background: var(--deep); color: rgba(255, 255, 255, 0.82); padding-block: 26px; margin-top: 40px }
+.foot-inner { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 15px }
+.foot nav { margin-inline-start: auto; display: flex; gap: 18px }
+.foot a { color: #fff; text-decoration: none; opacity: 0.85 }
+.foot a:hover { opacity: 1 }
+
+/* --- زر المبيعات --- */
+
+.chat {
+  position: fixed;
+  bottom: 22px;
+  inset-inline-start: 22px;
+  z-index: 30;
+  background: #1f9d55;
+  color: #fff;
+  border: 0;
+  border-radius: 999px;
+  padding: 13px 20px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 10px 26px rgba(31, 157, 85, 0.36);
+}
+
+/* --- الجوال --- */
+
+@media (max-width: 900px) {
+  h1 { font-size: 36px }
+  h2 { font-size: 26px }
+  .wrap { padding-inline: 16px }
+  .hero { padding-block: 40px 90px }
+  .hero-grid { grid-template-columns: 1fr; gap: 32px }
+  /* النموذج تحت النص لا فوقه: القارئ يقرأ العرض ثم يُطلَب منه بياناته */
+  .form-card { position: static; order: 2 }
+  .hero-text { order: 1 }
+  .mock { order: 3 }
+  .cards { grid-template-columns: 1fr }
+  .two { grid-template-columns: 1fr }
+  .mock-body { grid-template-columns: 1fr }
+  .mock-list { display: none }
+  .card { padding: 24px }
+}
+
+/* --- الوصول --- */
+
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto }
+  * { transition: none !important }
+}
