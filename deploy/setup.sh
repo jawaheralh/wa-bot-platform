@@ -22,10 +22,14 @@ echo "▸ تحصين الخادم"
 
 # صور Ubuntu على Oracle تأتي بقواعد iptables تحجب كل شيء عدا 22 —
 # فتح المنفذين في Security List وحده لا يكفي، والموقع يبدو معطّلاً بلا سبب.
+# القاعدة الأخيرة في السلسلة هي REJECT تحجب كل ما تبقى، فالإضافة بعدها
+# لا أثر لها إطلاقاً. نُدرج قبلها دائماً، لا في موضع رقمي ثابت.
 if command -v netfilter-persistent >/dev/null 2>&1 || [[ -f /etc/iptables/rules.v4 ]]; then
   for port in 80 443; do
-    iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null \
-      || iptables -I INPUT 6 -p tcp --dport "$port" -m conntrack --ctstate NEW -j ACCEPT
+    iptables -C INPUT -p tcp --dport "$port" -m conntrack --ctstate NEW -j ACCEPT 2>/dev/null && continue
+    reject_at=$(iptables -L INPUT -n --line-numbers \
+      | awk '$2=="REJECT" || $2=="DROP" {print $1; exit}')
+    iptables -I INPUT "${reject_at:-1}" -p tcp --dport "$port" -m conntrack --ctstate NEW -j ACCEPT
   done
   apt-get install -y iptables-persistent >/dev/null 2>&1 || true
   netfilter-persistent save >/dev/null 2>&1 || true
@@ -49,6 +53,11 @@ fi
 apt-get install -y unattended-upgrades >/dev/null 2>&1 || true
 dpkg-reconfigure -f noninteractive unattended-upgrades >/dev/null 2>&1 || true
 echo "  ✓ fail2ban · دخول بالمفتاح فقط · تحديثات أمنية تلقائية"
+
+# better-sqlite3 لا يوفّر نسخة جاهزة لمعالجات ARM، فيُبنى محلياً ويحتاج مترجماً.
+echo "▸ تثبيت أدوات البناء"
+apt-get install -y build-essential python3 >/dev/null 2>&1 || true
+echo "  ✓ make · g++ · python3"
 
 echo "▸ تثبيت Node.js 22"
 if ! command -v node >/dev/null || [[ "$(node -v | cut -d. -f1 | tr -d v)" -lt 22 ]]; then
