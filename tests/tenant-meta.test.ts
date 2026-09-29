@@ -1,0 +1,219 @@
+/**
+ * بيانات Meta لكل منشأة.
+ *
+ * المحك التجاري: عميلان بحسابَي Meta مختلفين يعملان معاً على نفس النظام،
+ * ولا يستطيع أحدهما الإرسال بتوكن الآخر.
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { createHmac } from 'node:crypto';
+import { freshDb, seedTenant, silentLogger } from './helpers.ts';
+import { loadConfig, type AppConfig } from '../src/config.ts';
+import { credentialsFor, allAppSecrets, tenantsByApp } from '../src/tenant-meta.ts';
+import { CloudApiProvider } from '../src/whatsapp/cloud-api.ts';
+import { getTenant, type Db } from '../src/db/index.ts';
+
+const GLOBAL = { token: 'GLOBAL_TOKEN', secret: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', app: 'APP_GLOBAL', biz: 'BIZ_GLOBAL' };
+const OWN = { token: 'OWN_TOKEN', secret: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', app: 'APP_OWN', biz: 'BIZ_OWN' };
+
+function config(): AppConfig {
+  return {
+    ...loadConfig(),
+    provider: 'cloud',
+    cloud: {
+      verifyToken: 'v',
+      appSecret: GLOBAL.secret,
+      accessToken: GLOBAL.token,
+      graphVersion: 'v23.0',
+      appId: GLOBAL.app,
+      businessId: GLOBAL.biz,
+    },
+  };
+}
+
+let db: Db;
+
+/** منشأة بحساب Meta خاص بها. */
+function seedOwn(name: string, waNumber: string, phoneNumberId: string): number {
+  const tenant = seedTenant(db, { name, waNumber, waPhoneNumberId: phoneNumberId });
+  db.prepare(
+    `UPDATE tenants SET wa_access_token = ?, wa_app_secret = ?, wa_app_id = ?, wa_business_id = ? WHERE id = ?`,
+  ).run(OWN.token, OWN.secret, OWN.app, OWN.biz, tenant.id);
+  return tenant.id;
+}
+
+beforeEach(() => {
+  db = freshDb();
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  db.close();
+});
+
+describe('اختيار بيانات الاعتماد', () => {
+  it('منشأة بلا حساب خاص ترث الحساب العام', () => {
+    const tenant = seedTenant(db, { name: 'عادية', waPhoneNumberId: 'PN1' });
+    const c = credentialsFor(config(), getTenant(db, tenant.id));
+    expect(c.accessToken).toBe(GLOBAL.token);
+    expect(c.own).toBe(false);
+  });
+
+  it('منشأة بحساب خاص تستعمله', () => {
+    const id = seedOwn('خاصة', '966500000002', 'PN2');
+    const c = credentialsFor(config(), getTenant(db, id));
+    expect(c.accessToken).toBe(OWN.token);
+    expect(c.appId).toBe(OWN.app);
+    expect(c.own).toBe(true);
+  });
+
+  it('حساب ناقص (توكن بلا سرّ) لا يُعدّ خاصاً', () => {
+    const tenant = seedTenant(db, { name: 'ناقصة', waPhoneNumberId: 'PN3' });
+    db.prepare('UPDATE tenants SET wa_access_token = ? WHERE id = ?').run('X', tenant.id);
+    expect(credentialsFor(config(), getTenant(db, tenant.id)).own).toBe(false);
+  });
+});
+
+describe('الإرسال بتوكن المنشأة', () => {
+  it('كل منشأة تُرسل بتوكنها هي', async () => {
+    const plain = seedTenant(db, { name: 'عادية', waNumber: '966500000001', waPhoneNumberId: 'PN_PLAIN' });
+    const ownId = seedOwn('خاصة', '966500000002', 'PN_OWN');
+
+    const calls: { url: string; auth: string }[] = [];
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      calls.push({ url, auth: String((init.headers as Record<string, string>).authorization) });
+      return new Response(JSON.stringify({ messages: [{ id: 'x' }] }), { status: 200 });
+    });
+
+    const provider = new CloudApiProvider(db, config(), silentLogger());
+    await provider.sendText(plain.id, '966555555555', 'أ');
+    await provider.sendText(ownId, '966555555555', 'ب');
+
+    expect(calls[0]?.auth).toBe(`Bearer ${GLOBAL.token}`);
+    expect(calls[0]?.url).toContain('PN_PLAIN');
+    expect(calls[1]?.auth).toBe(`Bearer ${OWN.token}`);
+    expect(calls[1]?.url).toContain('PN_OWN');
+  });
+
+  it('منشأة بلا توكن ولا حساب عام تُرفض برسالة واضحة', async () => {
+    const tenant = seedTenant(db, { name: 'بلا توكن', waPhoneNumberId: 'PN_X' });
+    const bare = { ...config(), cloud: { ...config().cloud, accessToken: '' } };
+    const provider = new CloudApiProvider(db, bare, silentLogger());
+    await expect(provider.sendText(tenant.id, '966555555555', 'س')).rejects.toThrow(/توكن Meta/);
+  });
+});
+
+describe('التحقق من التوقيع', () => {
+  it('يقبل توقيع الحساب العام وتوقيع حساب المنشأة الخاص', () => {
+    seedTenant(db, { name: 'عادية', waNumber: '966500000001', waPhoneNumberId: 'PN_PLAIN' });
+    seedOwn('خاصة', '966500000002', 'PN_OWN');
+
+    const provider = new CloudApiProvider(db, config(), silentLogger());
+    const body = '{"entry":[]}';
+
+    for (const secret of [GLOBAL.secret, OWN.secret]) {
+      const signature = `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
+      expect(provider.verifySignature(body, signature)).toBe(true);
+    }
+  });
+
+  it('يرفض سرّاً لا يخص أي منشأة', () => {
+    seedOwn('خاصة', '966500000002', 'PN_OWN');
+    const provider = new CloudApiProvider(db, config(), silentLogger());
+    const body = '{"entry":[]}';
+    const signature = `sha256=${createHmac('sha256', 'cccccccccccccccccccccccccccccccc').update(body).digest('hex')}`;
+    expect(provider.verifySignature(body, signature)).toBe(false);
+  });
+
+  it('الأسرار المجمَّعة بلا تكرار', () => {
+    seedTenant(db, { name: 'عادية', waNumber: '966500000001' });
+    seedOwn('خاصة', '966500000002', 'PN_OWN');
+    seedOwn('خاصة٢', '966500000003', 'PN_OWN2');
+
+    const secrets = allAppSecrets(db, config());
+    expect(secrets).toHaveLength(2);           // العام + الخاص (المكرر مرة)
+    expect(secrets).toContain(GLOBAL.secret);
+    expect(secrets).toContain(OWN.secret);
+  });
+});
+
+describe('تجميع المنشآت بالتطبيق', () => {
+  it('منشآت الحساب العام في مجموعة، والخاصة في أخرى', () => {
+    seedTenant(db, { name: 'أ', waNumber: '966500000001', waPhoneNumberId: 'PN1' });
+    seedTenant(db, { name: 'ب', waNumber: '966500000002', waPhoneNumberId: 'PN2' });
+    seedOwn('ج', '966500000003', 'PN3');
+
+    const groups = tenantsByApp(db, config());
+    expect(groups.size).toBe(2);
+    expect(groups.get(GLOBAL.app)?.tenants).toHaveLength(2);
+    expect(groups.get(OWN.app)?.tenants).toHaveLength(1);
+  });
+
+  it('المنشأة الموقوفة أو بلا معرّف رقم تُستثنى', () => {
+    const a = seedTenant(db, { name: 'موقوفة', waNumber: '966500000001', waPhoneNumberId: 'PN1' });
+    db.prepare(`UPDATE tenants SET status='suspended' WHERE id=?`).run(a.id);
+    seedTenant(db, { name: 'بلا معرّف', waNumber: '966500000002' });
+
+    expect(tenantsByApp(db, config()).size).toBe(0);
+  });
+});
+
+describe('مفتاح Claude لكل منشأة', () => {
+  it('المنشأة بمفتاحها الخاص، وغيرها بالمفتاح العام', async () => {
+    const { claudeFor, forgetClaudeCache } = await import('../src/tenant-claude.ts');
+    forgetClaudeCache();
+
+    const plain = seedTenant(db, { name: 'عادية', waNumber: '966500000001' });
+    const own = seedTenant(db, { name: 'خاصة', waNumber: '966500000002' });
+    db.prepare('UPDATE tenants SET anthropic_api_key = ? WHERE id = ?').run('sk-ant-own', own.id);
+
+    const base = { ...config(), anthropicApiKey: 'sk-ant-global' };
+    expect(claudeFor(base, getTenant(db, plain.id)!, silentLogger())?.own).toBe(false);
+    expect(claudeFor(base, getTenant(db, own.id)!, silentLogger())?.own).toBe(true);
+  });
+
+  it('بلا مفتاح خاص ولا عام: لا عميل', async () => {
+    const { claudeFor } = await import('../src/tenant-claude.ts');
+    const tenant = seedTenant(db, { name: 'بلا مفتاح' });
+    expect(claudeFor({ ...config(), anthropicApiKey: '' }, getTenant(db, tenant.id)!, silentLogger())).toBeUndefined();
+  });
+
+  it('الاستهلاك يُعدّ لكل منشأة على حدة', async () => {
+    const { recordUsage, usageThisMonth } = await import('../src/tenant-claude.ts');
+    const a = seedTenant(db, { name: 'أ', waNumber: '966500000001' });
+    const b = seedTenant(db, { name: 'ب', waNumber: '966500000002' });
+
+    recordUsage(db, a.id, 'replies', 3);
+    recordUsage(db, a.id, 'tool_calls', 2);
+    recordUsage(db, a.id, 'failures');
+    recordUsage(db, b.id, 'replies');
+
+    expect(usageThisMonth(db, a.id)).toMatchObject({ replies: 3, tool_calls: 2, failures: 1 });
+    expect(usageThisMonth(db, b.id)).toMatchObject({ replies: 1, tool_calls: 0 });
+  });
+});
+
+describe('المحرّك يحترم العميل المُمرَّر', () => {
+  it('منشأة بلا مفتاح خاص تستعمل العميل المحقون لا عميلاً جديداً', async () => {
+    const { buildApp } = await import('../src/app.ts');
+    const { createEngine } = await import('../src/bot/engine.ts');
+    const { SimulatorProvider } = await import('../src/whatsapp/simulator.ts');
+    const { mockClaude } = await import('./helpers.ts');
+
+    const tenant = seedTenant(db, { name: 'بلا مفتاح خاص', waNumber: '966500000009' });
+    const provider = new SimulatorProvider();
+    const app = await buildApp({
+      // مفتاح عام موجود — ومع ذلك يجب أن يُستعمل المحقون
+      config: { ...loadConfig(), provider: 'simulator', anthropicApiKey: 'sk-ant-global' },
+      db,
+      provider,
+      logger: silentLogger(),
+    });
+    const claude = mockClaude([{ text: 'من العميل المحقون' }]);
+    provider.onMessage(createEngine({ app, claude }));
+
+    await provider.receive({ toNumber: tenant.wa_number, from: '966555555555', text: 'سلام' });
+
+    expect(claude.requests).toHaveLength(1);
+    expect(provider.outbox[0]?.text).toBe('من العميل المحقون');
+  });
+});

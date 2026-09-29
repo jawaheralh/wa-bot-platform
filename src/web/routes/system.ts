@@ -12,6 +12,7 @@ import { listTenants, getTenant, normalizeNumber, type Db } from '../../db/index
 import type { AppConfig } from '../../config.ts';
 import { setEnabled, statusFor } from '../../modules/registry.ts';
 import { readEnvFile, writeEnvFile, maskSecret } from '../../env-file.ts';
+import { usageThisMonth, usageFor, forgetClaudeCache } from '../../tenant-claude.ts';
 import { randomBytes } from 'node:crypto';
 import type { WhatsAppProvider } from '../../whatsapp/provider.ts';
 
@@ -35,8 +36,15 @@ export function registerSystemRoutes(
         )
         .get(tenant.id) as { conversations: number; openComplaints: number; unseenAlerts: number };
 
+      const { wa_access_token, wa_app_secret, anthropic_api_key, ...safe } = tenant;
       return {
-        ...tenant,
+        ...safe,
+        hasOwnMeta: Boolean(wa_access_token && wa_app_secret),
+        hasOwnClaude: Boolean(anthropic_api_key),
+        waAccessTokenMasked: maskSecret(wa_access_token ?? ''),
+        waAppSecretMasked: maskSecret(wa_app_secret ?? ''),
+        anthropicKeyMasked: maskSecret(anthropic_api_key ?? ''),
+        usage: usageThisMonth(db, tenant.id),
         ...counts,
         modules: statusFor(db, tenant.id).map((m) => ({ name: m.name, titleAr: m.titleAr, core: m.core, enabled: m.enabled })),
         connection: provider.status(tenant.id),
@@ -76,6 +84,11 @@ export function registerSystemRoutes(
 
     db.prepare(
       `UPDATE tenants SET
+         wa_access_token = CASE WHEN ? THEN ? ELSE wa_access_token END,
+         wa_app_secret   = CASE WHEN ? THEN ? ELSE wa_app_secret END,
+         wa_app_id       = CASE WHEN ? THEN ? ELSE wa_app_id END,
+         wa_business_id  = CASE WHEN ? THEN ? ELSE wa_business_id END,
+         anthropic_api_key = CASE WHEN ? THEN ? ELSE anthropic_api_key END,
          name = COALESCE(?, name),
          wa_number = COALESCE(?, wa_number),
          wa_phone_number_id = COALESCE(?, wa_phone_number_id),
@@ -85,6 +98,17 @@ export function registerSystemRoutes(
          notes = COALESCE(?, notes)
        WHERE id = ?`,
     ).run(
+      // السرّ المحجوب المُعاد كما هو لا يُكتب فوق الأصل.
+      body.waAccessToken !== undefined && !body.waAccessToken.includes('…') ? 1 : 0,
+      body.waAccessToken?.trim() || null,
+      body.waAppSecret !== undefined && !body.waAppSecret.includes('…') ? 1 : 0,
+      body.waAppSecret?.trim() || null,
+      body.waAppId !== undefined ? 1 : 0,
+      body.waAppId?.trim() || null,
+      body.waBusinessId !== undefined ? 1 : 0,
+      body.waBusinessId?.trim() || null,
+      body.anthropicApiKey !== undefined && !body.anthropicApiKey.includes('…') ? 1 : 0,
+      body.anthropicApiKey?.trim() || null,
       body.name?.trim() || null,
       body.waNumber ? normalizeNumber(body.waNumber) : null,
       body.waPhoneNumberId?.trim() || null,
@@ -94,7 +118,16 @@ export function registerSystemRoutes(
       body.notes ?? null,
       id,
     );
+    // المفتاح تغيّر ⇐ العميل المخزَّن لم يعد صالحاً.
+    forgetClaudeCache();
     return getTenant(db, id);
+  });
+
+  /** استهلاك منشأة عبر الأشهر — للفوترة. */
+  app.get('/api/system/tenants/:id/usage', async (request) => {
+    requireSystemAdmin(request);
+    const id = Number((request.params as { id: string }).id);
+    return { usage: usageFor(db, id) };
   });
 
   /** تفعيل أو تعطيل وحدة لمنشأة — أدمن النظام فقط. */
@@ -209,17 +242,21 @@ export function registerSystemRoutes(
 
     const tenants = listTenants(db).filter((t) => t.wa_phone_number_id && t.status === 'active');
 
+    const { credentialsFor } = await import('../../tenant-meta.ts');
+
     const [token, secret, webhook] = await Promise.all([
       meta.checkToken(config),
       meta.checkAppSecret(config),
       config.publicUrl ? meta.checkWebhook(config) : Promise.resolve({ ok: false, message: 'لا يوجد عنوان عام بعد.' }),
     ]);
 
+    // كل منشأة تُفحص ببيانات حسابها هي — لا بالحساب العام.
     const numbers = await Promise.all(
-      tenants.map(async (t) => ({
-        tenant: t.name,
-        ...(await meta.checkPhoneNumber(config, t.wa_phone_number_id!)),
-      })),
+      tenants.map(async (t) => {
+        const credentials = credentialsFor(config, t);
+        const result = await meta.checkPhoneNumberFor(config, credentials, t.wa_phone_number_id!);
+        return { tenant: t.name, own: credentials.own, ...result };
+      }),
     );
 
     return {
@@ -244,7 +281,11 @@ export function registerSystemRoutes(
   app.post('/api/system/meta/configure-webhook', async (request) => {
     requireSystemAdmin(request);
     const meta = await import('../../meta-setup.ts');
-    return meta.configureWebhook(config);
+    const { tenantsByApp } = await import('../../tenant-meta.ts');
+    const groups = tenantsByApp(db, config);
+    // بلا منشآت مضبوطة: نرجع للتطبيق العام حتى لا يبقى الزر بلا أثر.
+    if (groups.size === 0) return meta.configureWebhook(config);
+    return meta.configureAllWebhooks(config, groups);
   });
 
   /** فحص الصحة الآن — لا ينتظر النبضة. */

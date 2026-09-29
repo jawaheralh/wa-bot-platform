@@ -12,7 +12,8 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { AppConfig } from '../config.ts';
-import { findTenantByPhoneNumberId, normalizeNumber, type Db } from '../db/index.ts';
+import { findTenantByPhoneNumberId, getTenant, normalizeNumber, type Db } from '../db/index.ts';
+import { credentialsFor, allAppSecrets } from '../tenant-meta.ts';
 import type { Logger } from '../logger.ts';
 import type {
   IncomingMessage,
@@ -102,22 +103,26 @@ export class CloudApiProvider implements WhatsAppProvider {
   --------------------------------------------------------------- */
 
   async sendText(tenantId: number, to: string, text: string): Promise<SendResult> {
-    const row = this.db
-      .prepare('SELECT wa_phone_number_id FROM tenants WHERE id = ?')
-      .get(tenantId) as { wa_phone_number_id: string | null } | undefined;
+    const tenant = getTenant(this.db, tenantId);
 
-    if (!row?.wa_phone_number_id) {
+    if (!tenant?.wa_phone_number_id) {
       throw new Error(`المنشأة ${tenantId} بلا wa_phone_number_id — لا يمكن الإرسال عبر Cloud API.`);
     }
 
-    const url = `https://graph.facebook.com/${this.config.cloud.graphVersion}/${row.wa_phone_number_id}/messages`;
+    // توكن المنشأة إن ملكت حساباً خاصاً، وإلا التوكن العام.
+    const credentials = credentialsFor(this.config, tenant);
+    if (!credentials.accessToken) {
+      throw new Error(`المنشأة «${tenant.name}» بلا توكن Meta — أدخليه في إعدادات المنشأة.`);
+    }
+
+    const url = `https://graph.facebook.com/${this.config.cloud.graphVersion}/${tenant.wa_phone_number_id}/messages`;
 
     const data = await withRetry(
       async () => {
         const response = await fetch(url, {
           method: 'POST',
           headers: {
-            authorization: `Bearer ${this.config.cloud.accessToken}`,
+            authorization: `Bearer ${credentials.accessToken}`,
             'content-type': 'application/json',
           },
           body: JSON.stringify({
@@ -157,15 +162,26 @@ export class CloudApiProvider implements WhatsAppProvider {
      التحقق من التوقيع
   --------------------------------------------------------------- */
 
-  /** HMAC-SHA256 على الجسم الخام كما وصل — أي إعادة تسلسل تُفسد التوقيع. */
+  /**
+   * HMAC-SHA256 على الجسم الخام كما وصل — أي إعادة تسلسل تُفسد التوقيع.
+   *
+   * يُجرَّب سرّ كل منشأة: التوقيع يُحسب بسرّ التطبيق الذي أرسله، ولا نعرف
+   * المرسِل قبل التحقق. تحليل الحمولة أولاً لمعرفته يعني الثقة بمحتوى لم
+   * يُتحقق منه بعد.
+   */
   verifySignature(rawBody: Buffer | string, header: string | undefined): boolean {
     if (!header?.startsWith('sha256=')) return false;
-    const expected = createHmac('sha256', this.config.cloud.appSecret)
-      .update(typeof rawBody === 'string' ? Buffer.from(rawBody, 'utf8') : rawBody)
-      .digest('hex');
-    const received = header.slice('sha256='.length);
-    if (received.length !== expected.length) return false;
-    return timingSafeEqual(Buffer.from(received, 'utf8'), Buffer.from(expected, 'utf8'));
+
+    const body = typeof rawBody === 'string' ? Buffer.from(rawBody, 'utf8') : rawBody;
+    const received = Buffer.from(header.slice('sha256='.length), 'utf8');
+
+    let matched = false;
+    for (const secret of allAppSecrets(this.db, this.config)) {
+      const expected = Buffer.from(createHmac('sha256', secret).update(body).digest('hex'), 'utf8');
+      // بلا خروج مبكر: الوقت لا يكشف أي سرّ طابق.
+      if (expected.length === received.length && timingSafeEqual(expected, received)) matched = true;
+    }
+    return matched;
   }
 
   /* ---------------------------------------------------------------
@@ -204,7 +220,7 @@ export class CloudApiProvider implements WhatsAppProvider {
               message.interactive?.list_reply?.title,
           };
 
-          const media = this.toMedia(message);
+          const media = this.toMedia(message, phoneNumberId);
           if (media) {
             incoming.media = media;
             // النص المصاحب للصورة هو طلب العميل غالباً.
@@ -231,7 +247,7 @@ export class CloudApiProvider implements WhatsAppProvider {
    * الموقع وجهة الاتصال لا يُنزَّلان — Meta ترسل بياناتهما في الحمولة
    * نفسها، فنُحوّلها نصاً مباشرةً.
    */
-  private toMedia(message: CloudMessage): IncomingMedia | undefined {
+  private toMedia(message: CloudMessage, phoneNumberId?: string): IncomingMedia | undefined {
     const attach = (kind: MediaKind, data: CloudMedia | undefined, fallbackMime: string): IncomingMedia | undefined => {
       if (!data?.id) return undefined;
       const mediaId = data.id;
@@ -240,7 +256,7 @@ export class CloudApiProvider implements WhatsAppProvider {
         mimeType: data.mime_type?.split(';')[0]?.trim() ?? fallbackMime,
         filename: data.filename,
         caption: data.caption,
-        download: () => this.downloadMedia(mediaId),
+        download: () => this.downloadMedia(mediaId, phoneNumberId),
       };
     };
 
@@ -274,8 +290,10 @@ export class CloudApiProvider implements WhatsAppProvider {
   }
 
   /** تحميل الوسائط خطوتان في Cloud API: طلب الرابط ثم تنزيله بنفس التوكن. */
-  private async downloadMedia(mediaId: string): Promise<Buffer> {
-    const token = this.config.cloud.accessToken;
+  private async downloadMedia(mediaId: string, phoneNumberId?: string): Promise<Buffer> {
+    // الوسائط تُنزَّل بتوكن صاحب الرقم لا بتوكن عام قد لا يملك صلاحية عليها.
+    const tenant = phoneNumberId ? findTenantByPhoneNumberId(this.db, phoneNumberId) : undefined;
+    const token = credentialsFor(this.config, tenant).accessToken;
     const metaResponse = await fetch(
       `https://graph.facebook.com/${this.config.cloud.graphVersion}/${mediaId}`,
       { headers: { authorization: `Bearer ${token}` } },

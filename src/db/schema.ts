@@ -20,6 +20,15 @@ export const CORE_TABLES: string[] = [
     staff_wa_number    TEXT,                             -- رقم الموظف الذي تصله التنبيهات
     status             TEXT    NOT NULL DEFAULT 'active',   -- active | suspended
     retention_days     INTEGER NOT NULL DEFAULT 0,          -- 0 = احتفاظ بلا حد
+    -- بيانات Meta الخاصة بالمنشأة. الفارغ يرث القيمة العامة من .env،
+    -- فالمنشأة التي تملك حساب Meta خاصاً تستعمله، وغيرها تستعمل حسابك.
+    wa_access_token    TEXT,
+    wa_app_secret      TEXT,
+    wa_app_id          TEXT,
+    wa_business_id     TEXT,
+    -- مفتاح Claude الخاص بالمنشأة: ينفد رصيده وحده فلا يوقف بقية العملاء.
+    anthropic_api_key  TEXT,
+    anthropic_model    TEXT,
     notes              TEXT,
     created_at         TEXT    NOT NULL DEFAULT (${SQL_NOW})
   )`,
@@ -113,6 +122,16 @@ export const CORE_TABLES: string[] = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_gaps_tenant ON knowledge_gaps(tenant_id, status, occurrences DESC)`,
 
+  /* --- استهلاك كل منشأة: للفوترة ولكشف من يستنزف رصيده --- */
+  `CREATE TABLE IF NOT EXISTS usage_log (
+    tenant_id  INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    month      TEXT    NOT NULL,              -- YYYY-MM بتوقيت الرياض
+    replies    INTEGER NOT NULL DEFAULT 0,    -- ردود البوت
+    tool_calls INTEGER NOT NULL DEFAULT 0,
+    failures   INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (tenant_id, month)
+  )`,
+
   /* --- سجل فحص الصحة: آخر نتيجة لكل فحص --- */
   `CREATE TABLE IF NOT EXISTS health_log (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -168,4 +187,10 @@ export const CORE_COLUMNS: [table: string, column: string, definition: string][]
   ['messages', 'media_bytes', 'INTEGER'],
   ['complaints', 'notified_status', 'TEXT'],
   ['tenants', 'retention_days', 'INTEGER NOT NULL DEFAULT 0'],
+  ['tenants', 'wa_access_token', 'TEXT'],
+  ['tenants', 'wa_app_secret', 'TEXT'],
+  ['tenants', 'wa_app_id', 'TEXT'],
+  ['tenants', 'wa_business_id', 'TEXT'],
+  ['tenants', 'anthropic_api_key', 'TEXT'],
+  ['tenants', 'anthropic_model', 'TEXT'],
 ];

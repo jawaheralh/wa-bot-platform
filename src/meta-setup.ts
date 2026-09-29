@@ -7,6 +7,7 @@
  */
 
 import type { AppConfig } from './config.ts';
+import type { MetaCredentials } from './tenant-meta.ts';
 
 const GRAPH = 'https://graph.facebook.com';
 
@@ -203,4 +204,56 @@ export async function configureWebhook(config: AppConfig): Promise<MetaResult<{ 
   }
 
   return { ok: true, message: 'تم الضبط.', data: { steps } };
+}
+
+
+/* ---------------------------------------------------------------
+   نسخ تعمل ببيانات اعتماد منشأة بعينها
+--------------------------------------------------------------- */
+
+function withCredentials(config: AppConfig, credentials: MetaCredentials): AppConfig {
+  return { ...config, cloud: { ...config.cloud, ...credentials } };
+}
+
+export const checkTokenFor = (config: AppConfig, c: MetaCredentials): Promise<MetaResult> =>
+  checkToken(withCredentials(config, c));
+
+export const checkAppSecretFor = (config: AppConfig, c: MetaCredentials): Promise<MetaResult> =>
+  checkAppSecret(withCredentials(config, c));
+
+export const checkPhoneNumberFor = (
+  config: AppConfig,
+  c: MetaCredentials,
+  phoneNumberId: string,
+): Promise<MetaResult> => checkPhoneNumber(withCredentials(config, c), phoneNumberId);
+
+export const checkWebhookFor = (config: AppConfig, c: MetaCredentials): Promise<MetaResult> =>
+  checkWebhook(withCredentials(config, c));
+
+/**
+ * يضبط الـwebhook لكل تطبيق Meta مستعمل.
+ *
+ * منشآت تحت حسابك تشترك في تطبيق واحد فيُسجَّل مرة، ومنشأة بحسابها الخاص
+ * لها تطبيقها فيُسجَّل لها على حدة. العنوان واحد — النظام يوجّه بـ
+ * phone_number_id بعد الاستلام.
+ */
+export async function configureAllWebhooks(
+  config: AppConfig,
+  groups: Map<string, { credentials: MetaCredentials; tenants: { name: string }[] }>,
+): Promise<MetaResult<{ steps: string[] }>> {
+  const steps: string[] = [];
+  let failures = 0;
+
+  for (const [appId, group] of groups) {
+    const names = group.tenants.map((t) => t.name).join('، ');
+    const result = await configureWebhook(withCredentials(config, group.credentials));
+    if (result.ok) steps.push(`تطبيق ${appId} (${names}): ${(result.data?.steps ?? []).join(' · ')}`);
+    else {
+      failures += 1;
+      steps.push(`تطبيق ${appId} (${names}): ✗ ${result.message}`);
+    }
+  }
+
+  if (groups.size === 0) return { ok: false, message: 'لا توجد منشأة نشطة لها معرّف رقم وتطبيق.' };
+  return { ok: failures === 0, message: failures ? 'بعض التطبيقات لم تُضبط.' : 'تم الضبط.', data: { steps } };
 }

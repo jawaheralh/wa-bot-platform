@@ -1,6 +1,6 @@
 /** شاشة أدمن النظام: كل المنشآت وإضافة منشأة. */
 
-import { get, post, esc, guard, flash, state } from '../core.js';
+import { get, post, patch, esc, guard, flash, state } from '../core.js';
 
 export async function renderTenants(main, onPick) {
   const tenants = await get('/api/system/tenants');
@@ -13,7 +13,7 @@ export async function renderTenants(main, onPick) {
       <div class="table-wrap"><table>
         <thead><tr>
           <th>المنشأة</th><th>الرقم</th><th>الاتصال</th><th>الوحدات</th>
-          <th>محادثات</th><th>شكاوى مفتوحة</th><th></th>
+          <th>محادثات</th><th>ردود الشهر</th><th>حساب Meta</th><th>مفتاح Claude</th><th></th>
         </tr></thead>
         <tbody>${tenants
           .map(
@@ -32,12 +32,52 @@ export async function renderTenants(main, onPick) {
                 .map((m) => esc(m.titleAr))
                 .join('، ')}</td>
               <td class="num">${t.conversations}</td>
-              <td class="num">${t.openComplaints}</td>
-              <td><button class="btn ghost small" data-pick="${t.id}">إدارة</button></td>
+              <td class="num">${t.usage?.replies ?? 0}${
+                t.usage?.failures ? ` <span class="badge red">${t.usage.failures} فشل</span>` : ''
+              }</td>
+              <td>${
+                t.hasOwnMeta ? '<span class="badge green">خاص</span>' : '<span class="badge grey">حسابك</span>'
+              }</td>
+              <td>${
+                t.hasOwnClaude ? '<span class="badge green">خاص</span>' : '<span class="badge grey">حسابك</span>'
+              }</td>
+              <td>
+                <button class="btn ghost small" data-pick="${t.id}">إدارة</button>
+                <button class="btn ghost small" data-meta="${t.id}">بيانات Meta</button>
+              </td>
             </tr>`,
           )
           .join('')}</tbody>
       </table></div>
+    </div>
+
+    <div class="card" id="metaCard" hidden>
+      <h3>بيانات Meta للمنشأة <span id="metaTenant"></span></h3>
+      <p class="muted">
+        كل عميل له حساب واتساب أعمال خاص: رقمه وتطبيقه وتوكنه. اتركي الحقول
+        فارغة ليستعمل حسابك أنتِ، أو أدخلي بياناته ليعمل بحسابه.
+      </p>
+      <div class="row">
+        <div><label for="mToken">توكن Meta الدائم</label><input id="mToken" dir="ltr" placeholder="اتركيه لعدم التغيير"></div>
+        <div><label for="mSecret">المفتاح السري للتطبيق</label><input id="mSecret" dir="ltr" placeholder="اتركيه لعدم التغيير"></div>
+      </div>
+      <div class="row">
+        <div><label for="mAppId">معرّف التطبيق</label><input id="mAppId" dir="ltr"></div>
+        <div><label for="mBizId">معرّف النشاط التجاري</label><input id="mBizId" dir="ltr"></div>
+        <div><label for="mPhoneId">معرّف الرقم (Phone number ID)</label><input id="mPhoneId" dir="ltr"></div>
+      </div>
+      <label for="mClaude">مفتاح Claude الخاص بالمنشأة</label>
+      <input id="mClaude" dir="ltr" placeholder="اتركيه لعدم التغيير">
+      <p class="muted" style="margin:4px 0 12px">
+        مفتاح خاص يعني أن رصيد هذا العميل ينفد وحده فلا يوقف بقية عملائك،
+        وأن تكلفته محسوبة عليه. اتركيه فارغاً ليستعمل مفتاحك.
+        <br>أنشئي في console.anthropic.com مساحة عمل لكل عميل وحدّدي لها
+        سقف إنفاق شهرياً، ثم ولّدي مفتاحاً بنطاقها.
+      </p>
+      <div class="actions">
+        <button class="btn" id="mSave">حفظ</button>
+        <button class="btn ghost" id="mClose">إغلاق</button>
+      </div>
     </div>
 
     <div class="card">
@@ -63,6 +103,47 @@ export async function renderTenants(main, onPick) {
 
   main.querySelectorAll('[data-pick]').forEach((button) => {
     button.onclick = () => onPick(Number(button.dataset.pick));
+  });
+
+  let editing = null;
+  main.querySelectorAll('[data-meta]').forEach((button) => {
+    button.onclick = () => {
+      editing = tenants.find((t) => t.id === Number(button.dataset.meta));
+      document.getElementById('metaTenant').textContent = `«${editing.name}»`;
+      document.getElementById('mToken').value = '';
+      document.getElementById('mToken').placeholder = editing.waAccessTokenMasked || 'غير مضبوط';
+      document.getElementById('mSecret').value = '';
+      document.getElementById('mSecret').placeholder = editing.waAppSecretMasked || 'غير مضبوط';
+      document.getElementById('mAppId').value = editing.wa_app_id ?? '';
+      document.getElementById('mBizId').value = editing.wa_business_id ?? '';
+      document.getElementById('mPhoneId').value = editing.wa_phone_number_id ?? '';
+      document.getElementById('mClaude').value = '';
+      document.getElementById('mClaude').placeholder = editing.anthropicKeyMasked || 'غير مضبوط — يستعمل مفتاحك';
+      const card = document.getElementById('metaCard');
+      card.hidden = false;
+      card.scrollIntoView({ behavior: 'smooth' });
+    };
+  });
+
+  document.getElementById('mClose').onclick = () => {
+    document.getElementById('metaCard').hidden = true;
+  };
+
+  document.getElementById('mSave').onclick = guard(async () => {
+    const v = (id) => document.getElementById(id).value.trim();
+    const payload = {
+      waAppId: v('mAppId'),
+      waBusinessId: v('mBizId'),
+      waPhoneNumberId: v('mPhoneId'),
+    };
+    // الفارغ يعني «لا تغيّر»، فلا يُرسل ولا يمسح السرّ المحفوظ.
+    if (v('mToken')) payload.waAccessToken = v('mToken');
+    if (v('mSecret')) payload.waAppSecret = v('mSecret');
+    if (v('mClaude')) payload.anthropicApiKey = v('mClaude');
+
+    await patch(`/api/system/tenants/${editing.id}`, payload);
+    flash('حُفظت بيانات Meta للمنشأة.');
+    await renderTenants(main, onPick);
   });
 
   document.getElementById('create').onclick = guard(async () => {

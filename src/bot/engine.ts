@@ -24,6 +24,7 @@ import { basePrompt, FALLBACK_REPLY, VOICE_DISABLED_REPLY } from './prompt.ts';
 import { buildHistory } from './history.ts';
 import { now } from '../time.ts';
 import { recordGap } from '../training.ts';
+import { claudeFor, recordUsage } from '../tenant-claude.ts';
 import type { Transcriber } from '../stt/index.ts';
 import { storeMedia, isVisionImage, MAX_BYTES } from '../media.ts';
 import { MEDIA_AR } from '../whatsapp/provider.ts';
@@ -54,6 +55,7 @@ export function joinWithoutRepeating(modelText: string, toolMessage: string): st
 
 export interface EngineOptions {
   app: App;
+  /** العميل الافتراضي. المنشأة ذات المفتاح الخاص تُبنى لها نسخة تخصّها. */
   claude: ClaudeClient;
   transcriber?: Transcriber;
 }
@@ -173,6 +175,16 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
       notify: (kind, title, body) => notify(tenant.id, kind, title, body, fresh.id),
     };
 
+    /**
+     * عميل Claude: مفتاح المنشأة إن ملكت واحداً، وإلا العميل المُمرَّر.
+     *
+     * المُمرَّر هو الافتراضي ويمثّل المفتاح العام، ولا يُتجاوز إلا بمفتاح
+     * خاص صريح — وإلا لضاع أي عميل يُحقَن (كما في الاختبارات).
+     */
+    const resolved = tenant.anthropic_api_key ? claudeFor(config, tenant, convLogger) : undefined;
+    const model = resolved?.client ?? claude;
+    if (resolved) convLogger.debug('استعمال مفتاح Claude الخاص بالمنشأة');
+
     const enabled = enabledFor(db, tenant.id);
     const attachmentNote =
       media && !visionImage
@@ -210,7 +222,7 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
 
     try {
       for (let round = 1; round <= MAX_TOOL_ROUNDS; round++) {
-        const result = await claude.chat({ system, messages, tools });
+        const result = await model.chat({ system, messages, tools });
 
         if (result.toolCalls.length === 0) {
           reply = result.text;
@@ -220,6 +232,8 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
         messages.push({ role: 'assistant', content: result.raw });
         const toolResults: ContentBlock[] = [];
         let stopMessage: string | null = null;
+
+        recordUsage(db, tenant.id, 'tool_calls', result.toolCalls.length);
 
         for (const call of result.toolCalls) {
           convLogger.info('نداء أداة', { أداة: call.name });
@@ -261,6 +275,7 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
       }
     } catch (error) {
       convLogger.error('فشل توليد الرد', error);
+      recordUsage(db, tenant.id, 'failures');
       await notify(
         tenant.id,
         'handoff',
@@ -289,6 +304,7 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
       reply = FALLBACK_REPLY;
     }
 
+    recordUsage(db, tenant.id, 'replies');
     await send(tenant, conversation.id, message.from, reply, convLogger);
     if (silenceAfter > 0) silenceConversation(db, conversation.id, silenceAfter);
   };

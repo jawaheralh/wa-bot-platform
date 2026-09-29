@@ -77,6 +77,12 @@ export interface TenantRow {
   staff_wa_number: string | null;
   status: 'active' | 'suspended';
   retention_days: number;
+  wa_access_token: string | null;
+  wa_app_secret: string | null;
+  wa_app_id: string | null;
+  wa_business_id: string | null;
+  anthropic_api_key: string | null;
+  anthropic_model: string | null;
   notes: string | null;
   created_at: string;
 }
