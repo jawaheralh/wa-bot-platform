@@ -99,7 +99,7 @@ export function explainSendFailure(status: number, body: string): string {
     return 'الرقم لا يستقبل رسائل واتساب — قد يكون غير مسجّل أو حظر الرقم.';
   }
   if (code === 131056) {
-    return 'أُرسلت رسائل كثيرة لهذا الرقم في وقت قصير. انتظري قليلاً.';
+    return 'أُرسلت رسائل كثيرة لهذا الرقم في وقت قصير — المحاولة بعد قليل.';
   }
   if (code === 190 || status === 401) {
     return 'توكن Meta منتهٍ أو غير صالح — جدّديه في إعدادات هذه المنشأة.';
@@ -154,7 +154,7 @@ export class CloudApiProvider implements WhatsAppProvider {
     // توكن المنشأة إن ملكت حساباً خاصاً، وإلا التوكن العام.
     const credentials = credentialsFor(this.config, tenant);
     if (!credentials.accessToken) {
-      throw new Error(`المنشأة «${tenant.name}» بلا توكن Meta — أدخليه في إعدادات المنشأة.`);
+      throw new Error(`المنشأة «${tenant.name}» بلا توكن Meta — يُدخَل في إعدادات المنشأة.`);
     }
 
     const url = `https://graph.facebook.com/${this.config.cloud.graphVersion}/${tenant.wa_phone_number_id}/messages`;
@@ -208,11 +208,11 @@ export class CloudApiProvider implements WhatsAppProvider {
   private credentialsOrThrow(tenantId: number): { tenant: TenantRow; token: string } {
     const tenant = getTenant(this.db, tenantId);
     if (!tenant?.wa_phone_number_id) {
-      throw new Error(`المنشأة ${tenantId} بلا معرّف رقم — أدخليه في إعدادات المنشأة.`);
+      throw new Error(`المنشأة ${tenantId} بلا معرّف رقم — يُدخَل في إعدادات المنشأة.`);
     }
     const credentials = credentialsFor(this.config, tenant);
     if (!credentials.accessToken) {
-      throw new Error(`المنشأة «${tenant.name}» بلا توكن Meta — أدخليه في إعدادات المنشأة.`);
+      throw new Error(`المنشأة «${tenant.name}» بلا توكن Meta — يُدخَل في إعدادات المنشأة.`);
     }
     return { tenant, token: credentials.accessToken };
   }

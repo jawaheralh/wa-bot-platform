@@ -82,7 +82,7 @@ export function submitDemoRequest(db: Db, input: DemoRequestInput, ip: string): 
 
   // الحدّان مقصودان معاً: العنوان يُبدَّل بسهولة، والبريد يُكرَّر بسهولة.
   if (tooMany(db, 'source_ip', ip, 24, 5)) {
-    throw Object.assign(new Error('طلبات كثيرة من هذا الجهاز. جرّبي لاحقاً.'), { statusCode: 429 });
+    throw Object.assign(new Error('طلبات كثيرة من هذا الجهاز — المحاولة بعد قليل.'), { statusCode: 429 });
   }
   if (tooMany(db, 'email', email, 24, 2)) {
     throw Object.assign(new Error('وصلنا طلبك وسنتواصل معك قريباً.'), { statusCode: 429 });

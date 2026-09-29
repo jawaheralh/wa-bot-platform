@@ -31,7 +31,7 @@ export async function renderPrivacy(main) {
 
     <div class="card">
       <h3>حقوق العميل</h3>
-      <p class="muted">أدخلي رقم العميل بصيغة 9665xxxxxxxx.</p>
+      <p class="muted">رقم العميل بصيغة 9665xxxxxxxx.</p>
       <div class="row">
         <div><label for="number">رقم العميل</label><input id="number" dir="ltr" placeholder="966501234567"></div>
         <div style="flex:0 0 auto">

@@ -17,16 +17,16 @@ export async function renderKnowledge(main) {
     <div class="card">
       <h3>تأسيس سريع بملف اكسل</h3>
       <p class="muted" style="margin-top:0">
-        نزّلي الملف، أرسليه للعميل ليملأه على مهله، ثم ارفعيه هنا.
+        يُنزَّل الملف ويُرسل للعميل ليملأه على مهله، ثم يُرفع هنا.
         ثلاث أوراق: <strong>المعرفة</strong> (ما يجيب عنه البوت)،
         <strong>الحدود</strong> (ما لا يجيب عنه أبداً)،
         <strong>الفروع</strong>.
       </p>
       <div class="actions">
         <a class="btn ghost" href="/api/tenants/${state.tenantId}/onboarding/template" download>
-          نزّلي ملف التأسيس
+          تنزيل ملف التأسيس
         </a>
-        <button class="btn" id="pickFile">ارفعي الملف بعد ملئه</button>
+        <button class="btn" id="pickFile">رفع الملف بعد ملئه</button>
         <input id="xlsxFile" type="file" accept=".xlsx" hidden>
       </div>
       <p class="muted" style="margin-top:8px">
@@ -155,7 +155,7 @@ export function wireOnboarding(main, reload) {
       // يُصفَّر دائماً وإلا تعذّر رفع الملف نفسه مرة أخرى بعد تصحيحه.
       picker.value = '';
       button.disabled = false;
-      button.textContent = 'ارفعي الملف بعد ملئه';
+      button.textContent = 'رفع الملف بعد ملئه';
     }
   });
 }

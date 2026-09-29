@@ -76,8 +76,8 @@ export async function renderModules(main) {
     <p class="subtitle">
       ${
         isSystemAdmin
-          ? 'أنتِ أدمن النظام: تستطيعين تفعيل وتعطيل الوحدات لهذه المنشأة.'
-          : 'الوحدات المفعّلة لمنشأتك وإعداداتها. للتفعيل تواصلي معنا.'
+          ? 'أنت أدمن النظام: يمكنك تفعيل الوحدات وتعطيلها لهذه المنشأة.'
+          : 'الوحدات المفعّلة لمنشأتك وإعداداتها. التفعيل يكون بالتواصل معنا.'
       }
     </p>
     <div class="grid">${modules.map((m) => card(m, isSystemAdmin, supportWhatsApp)).join('')}</div>

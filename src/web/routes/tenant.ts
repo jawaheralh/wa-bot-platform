@@ -651,7 +651,7 @@ export function registerTenantRoutes(
     const buffer = Buffer.from(raw.replace(/^data:[^,]*,/, ''), 'base64');
     if (buffer.length === 0) throw Object.assign(new Error('الملف فارغ.'), { statusCode: 400 });
     if (buffer.length > 5_000_000) {
-      throw Object.assign(new Error('الملف أكبر من ٥ ميجا — تأكدي أنه ملف التأسيس.'), { statusCode: 400 });
+      throw Object.assign(new Error('الملف أكبر من ٥ ميجا — يلزم أن يكون ملف التأسيس.'), { statusCode: 400 });
     }
 
     const { importWorkbook } = await import('../../onboarding.ts');
@@ -702,8 +702,8 @@ export function registerTenantRoutes(
     // الموظفة تكتب الرقم كما في دفترها؛ Meta تريده دولياً.
     const to = toInternational(String(body.to ?? ''));
     const name = String(body.name ?? '').trim();
-    if (!to) throw Object.assign(new Error('أدخلي رقم العميل.'), { statusCode: 400 });
-    if (!name) throw Object.assign(new Error('اختاري قالباً.'), { statusCode: 400 });
+    if (!to) throw Object.assign(new Error('رقم العميل مطلوب.'), { statusCode: 400 });
+    if (!name) throw Object.assign(new Error('القالب مطلوب.'), { statusCode: 400 });
 
     const variables = Array.isArray(body.variables) ? body.variables.map((v) => String(v ?? '').trim()) : [];
     if (variables.some((v) => !v)) {

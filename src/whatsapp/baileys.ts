@@ -220,8 +220,8 @@ export class BaileysProvider implements WhatsAppProvider {
 
       if (qr) {
         session.qr = qr;
-        session.detail = 'امسحي رمز QR من واتساب › الأجهزة المرتبطة';
-        this.logger.info(`رمز QR للمنشأة «${tenant.name}» — امسحيه من واتساب › الأجهزة المرتبطة`, {
+        session.detail = 'مسح رمز QR من واتساب › الأجهزة المرتبطة';
+        this.logger.info(`رمز QR للمنشأة «${tenant.name}» — يُمسح من واتساب › الأجهزة المرتبطة`, {
           tenant: tenant.id,
         });
         qrcode.generate(qr, { small: true });

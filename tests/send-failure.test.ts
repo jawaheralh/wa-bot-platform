@@ -32,7 +32,7 @@ describe('بقية الأسباب الشائعة', () => {
   });
 
   it('إرسال كثيف لنفس الرقم', () => {
-    expect(explainSendFailure(400, metaError(131056))).toContain('انتظري');
+    expect(explainSendFailure(400, metaError(131056))).toContain('رسائل كثيرة');
   });
 
   it('توكن منتهٍ يُرشد لمكان تجديده', () => {

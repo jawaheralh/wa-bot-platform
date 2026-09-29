@@ -103,7 +103,7 @@ export async function renderSetup(main) {
                  ? `<p class="muted" style="margin-top:10px">
                       ⚠️ منشأة على الإعدادات المشتركة تستهلك من توكنك ومن
                       حساب Claude العام، ويظهر رقمها تحت تطبيقك أنت.
-                      افتحي «كل المنشآت» وأدخلي لها توكن حسابها ومفتاحها.
+                      من «كل المنشآت» يُدخَل لكل منشأة توكن حسابها ومفتاحها.
                     </p>`
                  : ''
              }`
@@ -146,7 +146,7 @@ export async function renderSetup(main) {
                  </select>`
               : `<input id="f-${f.key}" data-key="${f.key}" data-secret="${f.secret}" dir="ltr"
                         value="${esc(f.value)}"
-                        placeholder="${f.secret && f.isSet ? 'اتركيه لعدم التغيير' : ''}">`
+                        placeholder="${f.secret && f.isSet ? 'بلا تغيير' : ''}">`
         }
         <p class="muted" style="margin:4px 0 12px">${esc(HINTS[f.key] ?? '')}</p>`,
         )
@@ -236,8 +236,8 @@ function testDataCard(data) {
       <div class="card">
         <h3>بيانات التجربة</h3>
         <p class="muted" style="margin:0">
-          لا توجد محادثات موسومة كتجربة. لوسم محادثة افتحيها من
-          <strong>المحادثات</strong> واضغطي «تجريبية».
+          لا توجد محادثات موسومة كتجربة. لوسم محادثة: تُفتح من
+          <strong>المحادثات</strong> ثم «وسم كتجربة».
         </p>
       </div>`;
   }
@@ -270,7 +270,7 @@ function testDataCard(data) {
       </p>
 
       <div class="actions">
-        <button class="btn danger" id="purgeTest">احذفي بيانات التجربة</button>
+        <button class="btn danger" id="purgeTest">حذف بيانات التجربة</button>
       </div>
     </div>`;
 }

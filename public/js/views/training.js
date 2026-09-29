@@ -60,15 +60,15 @@ export async function renderTraining(main) {
           }
           ${
             canEdit && g.status !== 'answered'
-              ? `<label for="a-${g.id}">الجواب الذي تريدين أن يقوله البوت</label>
-                 <textarea id="a-${g.id}" placeholder="اكتبي الجواب بأسلوبك — البوت سيقوله حرفياً"></textarea>
+              ? `<label for="a-${g.id}">الجواب الذي يقوله البوت</label>
+                 <textarea id="a-${g.id}" placeholder="الجواب كما يُقال للعميل — البوت سينقله"></textarea>
                  <div class="actions">
-                   <button class="btn small" data-answer="${g.id}">أضيفي للمعرفة</button>
-                   <button class="btn ghost small" data-ignore="${g.id}">أهمليه</button>
+                   <button class="btn small" data-answer="${g.id}">إضافة للمعرفة</button>
+                   <button class="btn ghost small" data-ignore="${g.id}">إهماله</button>
                  </div>`
               : g.status !== 'open' && canEdit
                 ? `<div class="actions">
-                     <button class="btn ghost small" data-reopen="${g.id}">أعيديه للقائمة</button>
+                     <button class="btn ghost small" data-reopen="${g.id}">إعادته للقائمة</button>
                    </div>`
                 : ''
           }
@@ -84,11 +84,11 @@ export async function renderTraining(main) {
     </div>
 
     <div class="card">
-      <h3>كيف تكتبين جواباً جيداً</h3>
+      <h3>كيف يُكتب جواب جيّد</h3>
       <ul class="muted" style="margin:0;padding-inline-start:20px;line-height:2">
-        <li>اكتبيه كما تقولينه للعميل — البوت ينقله بأسلوبه لا حرفياً كالببغاء.</li>
+        <li>يُكتب كما يُقال للعميل — البوت ينقله بأسلوبه لا حرفياً كالببغاء.</li>
         <li>أرقاماً دقيقة لا تقريبية: «٥ محطات» لا «عدة محطات».</li>
-        <li>ما لا تريدين للبوت قوله، لا تكتبيه — لن يخترعه.</li>
+        <li>ما لا يُراد للبوت قوله لا يُكتب — لن يخترعه.</li>
         <li>جواب واحد يكفي لعدة صيغ من السؤال؛ البوت يفهم المعنى.</li>
       </ul>
     </div>
@@ -106,7 +106,7 @@ export async function renderTraining(main) {
       const id = button.dataset.answer;
       const answer = document.getElementById(`a-${id}`).value.trim();
       if (!answer) {
-        flash('اكتبي الجواب أولاً.', 'error');
+        flash('الجواب فارغ.', 'error');
         return;
       }
       const result = await post(`/api/tenants/${state.tenantId}/gaps/${id}/answer`, { answer });

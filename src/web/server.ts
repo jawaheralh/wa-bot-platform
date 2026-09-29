@@ -234,7 +234,7 @@ export async function createServer(app: App): Promise<FastifyInstance> {
   server.post('/api/login/totp', async (request, reply) => {
     const pending = readPending(db, request);
     if (!pending) {
-      throw Object.assign(new Error('انتهت مهلة الدخول. سجّلي الدخول من جديد.'), { statusCode: 401 });
+      throw Object.assign(new Error('انتهت مهلة الدخول — يلزم تسجيل الدخول من جديد.'), { statusCode: 401 });
     }
 
     const key = `totp:${request.ip}`;

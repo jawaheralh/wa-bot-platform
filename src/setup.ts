@@ -101,7 +101,7 @@ async function testAnthropicKey(key: string): Promise<{ ok: boolean; message: st
     if (response.ok) return { ok: true, message: 'المفتاح يعمل ✓' };
 
     const body = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
-    if (response.status === 401) return { ok: false, message: 'المفتاح مرفوض — تأكدي من نسخه كاملاً.' };
+    if (response.status === 401) return { ok: false, message: 'المفتاح مرفوض — يلزم نسخه كاملاً.' };
     if (response.status === 429) return { ok: false, message: 'تجاوزتِ حد الاستعمال أو الرصيد منتهٍ.' };
     return { ok: false, message: `رفضت Anthropic (${response.status}): ${body.error?.message ?? ''}` };
   } catch (error) {
@@ -115,7 +115,7 @@ async function testMetaToken(token: string): Promise<{ ok: boolean; message: str
     const data = (await response.json().catch(() => ({}))) as { name?: string; id?: string; error?: { message?: string } };
     if (response.ok) return { ok: true, message: `التوكن يعمل ✓ (${data.name ?? data.id ?? ''})` };
     if (response.status === 401 || data.error?.message?.includes('expired')) {
-      return { ok: false, message: 'التوكن منتهٍ أو مرفوض — تأكدي أنه التوكن الدائم لا المؤقت.' };
+      return { ok: false, message: 'التوكن منتهٍ أو مرفوض — يلزم أن يكون التوكن الدائم لا المؤقت.' };
     }
     return { ok: false, message: `رفضت Meta: ${data.error?.message ?? response.status}` };
   } catch (error) {
@@ -156,14 +156,14 @@ const FIELDS: Field[] = [
     label: 'طريقة الربط بواتساب',
     hint: 'baileys = مسح QR برقم ثانوي · cloud = الرسمي (يحتاج خادماً) · simulator = بلا اتصال',
     validate: (v) =>
-      ['baileys', 'cloud', 'simulator'].includes(v) ? null : 'اكتبي: baileys أو cloud أو simulator.',
+      ['baileys', 'cloud', 'simulator'].includes(v) ? null : 'القيمة: baileys أو cloud أو simulator.',
   },
   {
     key: 'READ_ONLY',
     label: 'وضع عرض فقط (0 أو 1)',
     hint: '1 = يستقبل الرسائل ويعرضها ولا يُرسل شيئاً إطلاقاً.',
     optional: true,
-    validate: (v) => (v === '0' || v === '1' ? null : 'اكتبي 0 أو 1.'),
+    validate: (v) => (v === '0' || v === '1' ? null : 'القيمة 0 أو 1.'),
   },
   {
     key: 'WA_ACCESS_TOKEN',
@@ -179,7 +179,7 @@ const FIELDS: Field[] = [
     hint: 'developers.facebook.com ← إعدادات التطبيق ← أساسي ← إظهار. يلزم فقط عند cloud.',
     secret: true,
     optional: true,
-    validate: (v) => (/^[a-f0-9]{32}$/i.test(v) ? null : 'المفتاح ٣٢ خانة ست عشرية. تأكدي من نسخه كاملاً بلا مسافات.'),
+    validate: (v) => (/^[a-f0-9]{32}$/i.test(v) ? null : 'المفتاح ٣٢ خانة ست عشرية. يلزم نسخه كاملاً بلا مسافات.'),
   },
   {
     key: 'ANTHROPIC_API_KEY',
@@ -187,12 +187,12 @@ const FIELDS: Field[] = [
     hint: 'من console.anthropic.com ← API Keys. بدونه لن يرد البوت.',
     secret: true,
     test: testAnthropicKey,
-    validate: (v) => (v.startsWith('sk-ant-') ? null : 'المفتاح يبدأ عادةً بـsk-ant-. تأكدي من نسخه كاملاً.'),
+    validate: (v) => (v.startsWith('sk-ant-') ? null : 'المفتاح يبدأ عادةً بـsk-ant-. يلزم نسخه كاملاً.'),
   },
   {
     key: 'SUPPORT_WHATSAPP',
-    label: 'رقم الدعم (رقمك أنتِ) — اختياري',
-    hint: 'يظهر لعملائك عند الوحدات المعطّلة. اتركيه فارغاً حتى يكون لديك رقم خاص بالمنصة.',
+    label: 'رقم الدعم (رقم المنصة) — اختياري',
+    hint: 'يظهر لعملائك عند الوحدات المعطّلة. يُترك فارغاً حتى يكون للمنصة رقم خاص.',
     optional: true,
     validate: (v) =>
       v.trim() === '' || /^\d{10,15}$/.test(v.replace(/\D/g, '')) ? null : 'رقم غير صالح.',
@@ -200,7 +200,7 @@ const FIELDS: Field[] = [
   {
     key: 'OPENAI_API_KEY',
     label: 'مفتاح OpenAI (اختياري)',
-    hint: 'لتحويل الرسائل الصوتية لنص. اتركيه فارغاً لتعطيل الميزة.',
+    hint: 'لتحويل الرسائل الصوتية لنص. يُترك فارغاً لتعطيل الميزة.',
     secret: true,
     optional: true,
     test: testOpenAiKey,
@@ -267,7 +267,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.log(dim('\n  اتركي الحقل فارغاً واضغطي Enter للإبقاء على القيمة الحالية.\n'));
+  console.log(dim('\n  الحقل الفارغ مع Enter يُبقي القيمة الحالية.\n'));
 
   const ask = await createAsker();
   const updates = new Map<string, string>();
@@ -288,7 +288,7 @@ async function main(): Promise<void> {
         const problem = field.validate(value);
         if (problem) {
           console.log(red(`  ✗ ${problem}`));
-          const retry = await ask('  اكتبيها مرة أخرى (أو Enter للتخطي): ');
+          const retry = await ask('  القيمة مرة أخرى (أو Enter للتخطي): ');
           if (!retry) continue;
           updates.set(field.key, retry);
           continue;
@@ -325,7 +325,7 @@ async function main(): Promise<void> {
     console.log(dim(`  (نسخة احتياطية في .env.backup)`));
     console.log(bold('\nالخطوة التالية:\n'));
     console.log('  npm start');
-    console.log(dim('  ثم افتحي http://localhost:4000\n'));
+    console.log(dim('  ثم العنوان http://localhost:4000\n'));
   } finally {
     ask.close();
   }

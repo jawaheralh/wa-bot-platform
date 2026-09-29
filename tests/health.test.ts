@@ -135,9 +135,9 @@ describe('التنبيه عند التغيّر فقط', () => {
   it('التنبيه يحمل الحل لا العطل فقط', async () => {
     const app = await makeApp();
     await alertIfChanged(app, [
-      { key: 'claude', label: 'مفتاح Claude', severity: 'down', message: 'مرفوض', fix: 'الصقي مفتاحاً جديداً' },
+      { key: 'claude', label: 'مفتاح Claude', severity: 'down', message: 'مرفوض', fix: 'يُلصق مفتاح جديد' },
     ] as never);
-    expect(provider.outbox[0]?.text).toContain('الحل: الصقي مفتاحاً جديداً');
+    expect(provider.outbox[0]?.text).toContain('الحل: يُلصق مفتاح جديد');
   });
 
   it('كل فحص يُسجَّل في health_log', async () => {

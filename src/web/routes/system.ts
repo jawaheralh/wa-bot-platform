@@ -201,7 +201,7 @@ export function registerSystemRoutes(
     const secret = updates.get('WA_APP_SECRET');
     if (secret && !/^[a-f0-9]{32}$/i.test(secret)) {
       throw Object.assign(
-        new Error('المفتاح السري ٣٢ خانة ست عشرية. تأكدي من نسخه كاملاً بلا مسافات.'),
+        new Error('المفتاح السري ٣٢ خانة ست عشرية. يلزم نسخه كاملاً بلا مسافات.'),
         { statusCode: 400 },
       );
     }
@@ -339,7 +339,7 @@ export function registerSystemRoutes(
       message: tenant.anthropic_api_key
         ? 'مفتاح خاص بهذه المنشأة — مصروفها منفصل.'
         : config.anthropicApiKey
-          ? 'تستعمل المفتاح العام — مصروفها على حسابك أنتِ.'
+          ? 'تستعمل المفتاح العام — مصروفها على حسابك أنت.'
           : 'لا يوجد مفتاح — البوت لن يرد.',
     });
 
@@ -381,7 +381,7 @@ export function registerSystemRoutes(
 
     if (!credentials.appId || !credentials.appSecret) {
       throw Object.assign(
-        new Error('أدخلي توكن المنشأة ومفتاحها السري ومعرّف تطبيقها أولاً.'),
+        new Error('يلزم إدخال توكن المنشأة ومفتاحها السري ومعرّف تطبيقها أولاً.'),
         { statusCode: 400 },
       );
     }

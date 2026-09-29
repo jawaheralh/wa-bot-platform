@@ -60,11 +60,11 @@ if (listTenants(db).length === 0) {
 if (created.length === 0) {
   console.log('لا جديد — الحسابات والمنشآت موجودة بالفعل.');
 } else {
-  console.log('\n  احفظي هذه الآن — لن تُعرض مرة أخرى:\n');
+  console.log('\n  تُحفظ الآن — لن تُعرض مرة أخرى:\n');
   for (const [label, username, password] of created) {
     console.log(`    ${username.padEnd(8)} ${password.padEnd(14)} ${label}`);
   }
-  console.log('\n  غيّريها من شاشة «الموظفون» بعد أول دخول.\n');
+  console.log('\n  تُغيَّر من شاشة «الموظفون» بعد أول دخول.\n');
 }
 
 db.close();

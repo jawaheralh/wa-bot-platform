@@ -234,7 +234,7 @@ if (process.argv[1]?.endsWith('purge-test.ts')) {
         console.log(`  ✓ حُذفت — ${touched.join(' · ')}`);
       }
     }
-    if (!apply) console.log('\nعرض فقط. للتنفيذ أضيفي --apply\n');
+    if (!apply) console.log('\nعرض فقط. للتنفيذ: --apply\n');
     else {
       db.exec('VACUUM');
       console.log('\n✓ تم.\n');
@@ -259,7 +259,7 @@ if (process.argv[1]?.endsWith('purge-test.ts')) {
   }
 
   if (!apply) {
-    console.log('\nعرض فقط. للتنفيذ أضيفي --apply\n');
+    console.log('\nعرض فقط. للتنفيذ: --apply\n');
   } else {
     applyPlan(db, plan, config.dbPath);
     console.log('\n✓ نُفّذ الحذف.\n');

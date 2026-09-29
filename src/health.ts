@@ -63,11 +63,11 @@ async function checkClaude(app: App): Promise<HealthCheck> {
         severity: 'down',
         message: `مرفوض: ${detail}`,
         // السبب الأشيع بعد الخطأ الكتابي: مفتاح بنطاق Organization
-        fix: 'تأكدي أن نطاق المفتاح Default لا Organization، أو أنه لم ينتهِ. ثم الصقيه في صفحة الإعداد.',
+        fix: 'يلزم أن يكون نطاق المفتاح Default لا Organization، وأن يكون صالحاً. ثم يُلصق في صفحة الإعداد.',
       };
     }
     if (response.status === 429) {
-      return { ...base, severity: 'down', message: `تجاوز الحد أو نفد الرصيد: ${detail}`, fix: 'راجعي الرصيد في console.anthropic.com ← Billing' };
+      return { ...base, severity: 'down', message: `تجاوز الحد أو نفد الرصيد: ${detail}`, fix: 'الرصيد في console.anthropic.com ← Billing' };
     }
     return { ...base, severity: 'warn', message: detail };
   } catch (error) {
@@ -86,7 +86,7 @@ async function checkMeta(app: App): Promise<HealthCheck[]> {
     label: 'توكن Meta',
     severity: token.ok ? 'ok' : 'down',
     message: token.message,
-    fix: token.ok ? undefined : 'ولّدي توكناً دائماً من Business settings ← مستخدمو النظام، والصقيه في صفحة الإعداد.',
+    fix: token.ok ? undefined : 'التوكن الدائم يُولَّد من Business settings ← مستخدمو النظام، ثم يُلصق في صفحة الإعداد.',
   });
 
   if (app.config.publicUrl) {
@@ -104,7 +104,7 @@ async function checkMeta(app: App): Promise<HealthCheck[]> {
       label: 'الـwebhook',
       severity: 'down',
       message: 'لا يوجد عنوان عام — لا تصل رسائل العملاء.',
-      fix: 'شغّلي نفقاً أو انشري على خادم، ثم اضبطي الـwebhook.',
+      fix: 'يلزم تشغيل نفق أو النشر على خادم، ثم ضبط الـwebhook.',
     });
   }
   return checks;

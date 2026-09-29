@@ -12,7 +12,7 @@ export async function renderComplaints(main) {
 
   main.innerHTML = `
     <h2>الشكاوى</h2>
-    <p class="subtitle">${list.length} شكوى · غيّري الحالة مباشرة من الجدول</p>
+    <p class="subtitle">${list.length} شكوى · الحالة تُغيَّر مباشرة من الجدول</p>
     <div class="card">
       ${
         list.length

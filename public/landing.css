@@ -154,7 +154,9 @@ body[dir='ltr'] .hero-cut { clip-path: polygon(0 0, 100% 55%, 100% 100%, 0 100%)
 
 /* --- البطاقات --- */
 
-.card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 32px }
+/* اللون صريح: البطاقة تقع داخل البطل الذي يفرض color:#fff على ما فيه،
+   فما لا يحمل لوناً خاصاً به كان يخرج أبيض على أبيض — أي مختفياً. */
+.card { background: #fff; color: var(--ink); border-radius: var(--radius); box-shadow: var(--shadow); padding: 32px }
 .form-card { position: sticky; top: 92px }
 
 .accent {

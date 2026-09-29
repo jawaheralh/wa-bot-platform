@@ -84,7 +84,7 @@ export interface AppConfig {
   };
   /**
    * وضع المراقبة: يستقبل الرسائل ويعرضها ولا يُرسل شيئاً إطلاقاً.
-   * للفترة التي تريدين فيها رؤية ما يصل الرقم قبل أن يتكلم النظام باسمك.
+   * للفترة التي يُراد فيها رؤية ما يصل الرقم قبل أن يتكلم النظام باسم المنشأة.
    */
   readOnly: boolean;
   /**
@@ -129,7 +129,7 @@ export function loadConfig(): AppConfig {
   if (!sessionSecret) {
     if (isPublic) {
       throw new Error(
-        'SESSION_SECRET مطلوب في الإنتاج. ولّديه بـ:  openssl rand -hex 32',
+        'SESSION_SECRET مطلوب في الإنتاج. يُولَّد بـ:  openssl rand -hex 32',
       );
     }
     // سرّ عشوائي يكفي للتطوير، لكنه يُبطل الجلسات عند كل إعادة تشغيل.
@@ -144,7 +144,7 @@ export function loadConfig(): AppConfig {
    */
   if (isPublic && (sessionSecret.includes('change-me') || sessionSecret.length < 32)) {
     throw new Error(
-      'SESSION_SECRET ضعيف أو هو قيمة المثال. ولّدي سرّاً حقيقياً:  openssl rand -hex 32',
+      'SESSION_SECRET ضعيف أو هو قيمة المثال. يُولَّد سرّ حقيقي بـ:  openssl rand -hex 32',
     );
   }
 

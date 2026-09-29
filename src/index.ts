@@ -39,7 +39,7 @@ async function main(): Promise<void> {
   });
 
   if (tenants.length === 0) {
-    logger.warn('لا توجد منشآت بعد — شغّلي «npm run seed» لإنشاء منشأة تجريبية.');
+    logger.warn('لا توجد منشآت بعد — «npm run seed» تُنشئ منشأة تجريبية.');
   }
 
 

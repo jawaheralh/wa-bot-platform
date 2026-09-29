@@ -40,7 +40,7 @@ export async function renderConversations(main) {
 
   main.innerHTML = `
     <h2>المحادثات</h2>
-    <p class="subtitle">${list.length} محادثة · اضغطي على محادثة لعرضها والرد فيها</p>
+    <p class="subtitle">${list.length} محادثة · الضغط على محادثة يعرضها ويتيح الرد فيها</p>
     <div class="card">
       ${
         list.length
@@ -122,7 +122,7 @@ async function openThread(conversationId, main, staff) {
         viewer
           ? `<div class="error">⚠️ ${esc(viewer.display_name)} فتح هذه المحادثة قبل ${
               viewer.seconds < 60 ? `${viewer.seconds} ثانية` : 'دقيقة'
-            } — تأكدي قبل الرد حتى لا يصل العميل ردّان.</div>`
+            } — يلزم التأكد قبل الرد حتى لا يصل العميل ردّان.</div>`
           : ''
       }
       ${
@@ -168,11 +168,11 @@ async function openThread(conversationId, main, staff) {
       <div id="templateBox"></div>
 
       <label for="reply">رد يدوي (يُسكت البوت تلقائياً ويُسجَّل باسمك)</label>
-      <textarea id="reply" placeholder="اكتبي ردك للعميل…"></textarea>
+      <textarea id="reply" placeholder="نص الرد للعميل…"></textarea>
       <div class="actions">
         <button class="btn" id="send">إرسال</button>
         <button class="btn ghost" id="toggle">${conversation.bot_enabled ? 'إيقاف البوت' : 'تشغيل البوت'}</button>
-        <button class="btn ghost" id="wake" hidden>أعيدي البوت الآن</button>
+        <button class="btn ghost" id="wake" hidden>إعادة البوت الآن</button>
         <button class="btn ghost" id="markTest" title="الموسوم وحده يُحذف بزر «حذف بيانات التجربة»">
           ${conversation.is_test ? '✓ موسومة تجريبية' : 'وسم كتجربة'}
         </button>
@@ -279,7 +279,7 @@ function silenceNotice(conversation) {
       <p class="muted" style="margin:6px 0 0">
         يصمت تلقائياً بعد التحويل لموظف أو بعد ردّ يدوي، حتى لا يقاطع
         الموظف وهو يعالج الحالة. رسائل العميل تصل وتُحفظ، ولا يُرد
-        عليها آلياً. اضغطي «أعيدي البوت الآن» إن لم تعد هناك حاجة للتدخّل.
+        عليها آلياً. وزر «إعادة البوت الآن» يعيده قبل ذلك إن لم تعد هناك حاجة للتدخّل.
       </p>
     </div>`;
 }
@@ -364,7 +364,7 @@ async function renderTemplates(box, conversation, main, staff) {
   if (templates.length === 0) {
     box.innerHTML = `
       <p class="muted">
-        لا قوالب معتمدة بعد. أنشئيها في
+        لا قوالب معتمدة بعد. تُنشأ في
         <strong>Meta ← WhatsApp Manager ← Message templates</strong>،
         وبعد اعتمادها تظهر هنا.
       </p>`;
@@ -372,7 +372,7 @@ async function renderTemplates(box, conversation, main, staff) {
   }
 
   box.innerHTML = `
-    <label for="tpl">أرسلي بقالب معتمد</label>
+    <label for="tpl">الإرسال بقالب معتمد</label>
     <select id="tpl">
       ${templates
         .map((t, i) => `<option value="${i}">${esc(t.name)} · ${esc(t.language)}</option>`)

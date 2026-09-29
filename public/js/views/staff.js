@@ -26,7 +26,7 @@ export async function renderStaff(main) {
         <tbody>${staff
           .map(
             (s) => `<tr>
-              <td>${esc(s.displayName)}${s.id === state.me.id ? ' <span class="badge grey">أنتِ</span>' : ''}</td>
+              <td>${esc(s.displayName)}${s.id === state.me.id ? ' <span class="badge grey">أنت</span>' : ''}</td>
               <td class="mono">${esc(s.username)}</td>
               <td>${
                 isOwner && s.id !== state.me.id

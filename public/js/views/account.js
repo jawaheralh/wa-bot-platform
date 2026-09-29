@@ -65,7 +65,7 @@ export async function renderAccount(main) {
     }
 
     await post('/api/me/password', { current, next });
-    flash('تم تغيير كلمة المرور. سجّلي الدخول من جديد.');
+    flash('تم تغيير كلمة المرور — يلزم تسجيل الدخول من جديد.');
     setTimeout(() => {
       location.href = '/login.html';
     }, 1500);
@@ -111,14 +111,14 @@ function drawSetup(box, setup) {
   box.innerHTML = `
     <ol class="steps">
       <li>
-        نزّلي تطبيق مصادقة على جوالك —
+        تنزيل تطبيق مصادقة على الجوال —
         <strong>Google Authenticator</strong> أو <strong>Microsoft Authenticator</strong>.
       </li>
       <li>
-        اختاري فيه «إضافة حساب» ثم «إدخال مفتاح الإعداد»، وأدخلي:
+        اختيار «إضافة حساب» فيه ثم «إدخال مفتاح الإعداد»، وإدخال:
         <div class="secret" dir="ltr">${esc(grouped)}</div>
       </li>
-      <li>اكتبي الرمز المعروض في التطبيق للتأكيد:</li>
+      <li>كتابة الرمز المعروض في التطبيق للتأكيد:</li>
     </ol>
 
     <div style="max-width:220px">
@@ -146,8 +146,8 @@ function drawRecovery(box, codes) {
   box.innerHTML = `
     <p><strong style="color:var(--ok,#0a7)">فُعّل التحقق بخطوتين ✓</strong></p>
     <p class="muted">
-      احفظي هذه الرموز في مكان آمن. كلٌّ يُستعمل مرة واحدة، وهي طريقك
-      الوحيد للدخول لو ضاع جوالك.
+      تُحفظ هذه الرموز في مكان آمن. كلٌّ يُستعمل مرة واحدة، وهي الطريق
+      الوحيد للدخول لو ضاع الجوال.
       <strong>لن تُعرض مرة أخرى.</strong>
     </p>
     <div class="secret" dir="ltr">${codes.map(esc).join('<br>')}</div>

@@ -169,6 +169,6 @@ describe('ربط webhook لمنشأة بعينها', () => {
       payload: {},
     });
     expect(response.statusCode).toBe(400);
-    expect(response.json().error).toContain('أدخلي توكن المنشأة');
+    expect(response.json().error).toContain('توكن المنشأة');
   });
 });

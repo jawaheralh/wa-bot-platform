@@ -141,7 +141,7 @@ function field(key, label, value, secret) {
     }</label>
     <input id="f-${key}" dir="ltr" data-secret="${secret ? '1' : '0'}"
            value="${esc(value ?? '')}"
-           placeholder="${secret && value ? 'اتركيه لعدم التغيير' : ''}">
+           placeholder="${secret && value ? 'بلا تغيير' : ''}">
     <p class="muted" style="margin:4px 0 12px">${esc(HINTS[key] ?? '')}</p>
   `;
 }

@@ -56,7 +56,7 @@ const engine = createEngine({
 provider.onMessage(engine);
 
 console.log(`\n▸ محاكاة محادثة مع «${tenant.name}» (${tenant.tone === 'formal' ? 'نبرة رسمية' : 'نبرة ودّية'})`);
-console.log(`  العميل: ${customer}   |   اكتبي /خروج للإنهاء\n`);
+console.log(`  العميل: ${customer}   |   /خروج للإنهاء\n`);
 
 async function say(text: string): Promise<void> {
   console.log(`\x1b[36mالعميل:\x1b[0m ${text}`);

@@ -197,14 +197,14 @@ function render() {
 
 async function draw(main) {
   try {
-    // قبل حارس «اختاري منشأة»: حسابي لا يخصّ منشأة، وأدمن النظام
+    // قبل حارس «اختيار منشأة»: حسابي لا يخصّ منشأة، وأدمن النظام
     // يدخلها وهو لم يختر أي منشأة بعد.
     if (state.view === 'account') {
       await renderAccount(main);
       return;
     }
 
-    // قبل حارس «اختاري منشأة»: الطلب ليس لمنشأة بعد.
+    // قبل حارس «اختيار منشأة»: الطلب ليس لمنشأة بعد.
     if (state.view === 'leads') {
       await renderLeads(main);
       return;
@@ -234,7 +234,7 @@ async function draw(main) {
     }
 
     if (!state.tenantId) {
-      main.innerHTML = '<div class="empty">اختاري منشأة من القائمة.</div>';
+      main.innerHTML = '<div class="empty">لم تُحدَّد منشأة بعد — الاختيار من القائمة في الأعلى.</div>';
       return;
     }
 

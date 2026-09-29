@@ -116,7 +116,7 @@ export function login(db: Db, username: string, password: string): UserRow {
   if (!user) throw invalid;
   if (!verifyPassword(password, user.password_hash)) throw invalid;
   if (user.active === 0) {
-    throw Object.assign(new Error('هذا الحساب معطَّل. راجعي مالك المنشأة.'), { statusCode: 403 });
+    throw Object.assign(new Error('هذا الحساب معطَّل — المراجعة مع مالك المنشأة.'), { statusCode: 403 });
   }
   return user;
 }
@@ -201,7 +201,7 @@ export function checkLoginRate(key: string): void {
   if (entry && entry.until > now && entry.count >= MAX_ATTEMPTS) {
     const minutes = Math.ceil((entry.until - now) / 60_000);
     throw Object.assign(
-      new Error(`محاولات كثيرة. انتظري ${minutes} دقيقة ثم أعيدي المحاولة.`),
+      new Error(`محاولات كثيرة — المحاولة بعد ${minutes} دقيقة.`),
       { statusCode: 429 },
     );
   }

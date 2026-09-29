@@ -60,7 +60,7 @@ export async function checkToken(config: AppConfig): Promise<MetaResult> {
     const message = errorOf(result.data, result.status);
     return {
       ok: false,
-      message: message.includes('expired') ? 'التوكن منتهٍ — ولّدي توكناً دائماً.' : message,
+      message: message.includes('expired') ? 'التوكن منتهٍ — يلزم توكن دائم.' : message,
     };
   }
   return { ok: true, message: `صالح — ${String(result.data.name ?? result.data.id ?? '')}` };
@@ -72,7 +72,7 @@ export async function checkAppSecret(config: AppConfig): Promise<MetaResult> {
 
   const result = await call(config, config.cloud.appId, { token: appToken(config) });
   if (!result.ok) {
-    return { ok: false, message: 'المفتاح السري لا يطابق معرّف التطبيق. تأكدي أنهما من نفس التطبيق.' };
+    return { ok: false, message: 'المفتاح السري لا يطابق معرّف التطبيق — يلزم أن يكونا من نفس التطبيق.' };
   }
   return { ok: true, message: `يطابق تطبيق «${String(result.data.name ?? '')}»` };
 }
@@ -116,7 +116,7 @@ export async function checkWebhook(config: AppConfig): Promise<MetaResult> {
   if (!matches) {
     return {
       ok: false,
-      message: `مسجَّل على عنوان آخر: ${whatsapp.callback_url ?? '؟'} — اضغطي «اضبط الـwebhook» للتحديث.`,
+      message: `مسجَّل على عنوان آخر: ${whatsapp.callback_url ?? '؟'} — زر «اضبط الـwebhook» يحدّثه.`,
     };
   }
   if (!hasMessages) return { ok: false, message: 'مسجَّل لكن حقل messages غير مفعّل.' };
@@ -148,7 +148,7 @@ export async function configureWebhook(config: AppConfig): Promise<MetaResult<{ 
   const steps: string[] = [];
 
   if (!config.publicUrl) {
-    return { ok: false, message: 'لا يوجد عنوان عام (PUBLIC_URL). شغّلي نفقاً أو انشري على خادم أولاً.' };
+    return { ok: false, message: 'لا يوجد عنوان عام (PUBLIC_URL). يلزم تشغيل نفق أو النشر على خادم أولاً.' };
   }
   if (!config.cloud.appId || !config.cloud.appSecret) {
     return { ok: false, message: 'يلزم معرّف التطبيق ومفتاحه السري.' };
@@ -174,7 +174,7 @@ export async function configureWebhook(config: AppConfig): Promise<MetaResult<{ 
     return {
       ok: false,
       message: message.includes('URL')
-        ? `تعذّر على Meta الوصول لعنوانك: ${message} — تأكدي أن النفق يعمل.`
+        ? `تعذّر على Meta الوصول لعنوانك: ${message} — يلزم التأكد من أن النفق يعمل.`
         : message,
     };
   }
@@ -185,7 +185,7 @@ export async function configureWebhook(config: AppConfig): Promise<MetaResult<{ 
   if (wabas.length === 0) {
     return {
       ok: true,
-      message: 'ضُبط الـwebhook، لكن تعذّر إيجاد حساب واتساب للاشتراك. تأكدي من معرّف النشاط التجاري.',
+      message: 'ضُبط الـwebhook، لكن تعذّر إيجاد حساب واتساب للاشتراك — يلزم التأكد من معرّف النشاط التجاري.',
       data: { steps },
     };
   }

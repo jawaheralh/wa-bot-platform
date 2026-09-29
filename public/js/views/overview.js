@@ -45,8 +45,8 @@ export async function renderOverview(main) {
                <img src="/api/tenants/${state.tenantId}/qr?t=${Date.now()}" alt="رمز QR"
                     style="width:280px;height:280px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px">
                <p class="muted" style="margin:10px 0 0">
-                 واتساب على جوالك ← الإعدادات ← <strong>الأجهزة المرتبطة</strong> ← ربط جهاز ← وجّهي الكاميرا للرمز.
-                 <br>الرمز يتجدد كل ٢٠ ثانية — اضغطي «تحديث» إن انتهت صلاحيته.
+                 واتساب على الجوال ← الإعدادات ← <strong>الأجهزة المرتبطة</strong> ← ربط جهاز ← توجيه الكاميرا للرمز.
+                 <br>الرمز يتجدد كل ٢٠ ثانية — زر «تحديث» يجدّده إن انتهت صلاحيته.
                </p>
                <button class="btn ghost small" id="refreshQr" style="margin-top:8px">تحديث الرمز</button>
              </div>`

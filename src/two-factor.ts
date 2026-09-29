@@ -44,12 +44,12 @@ export function startSetup(db: Db, userId: number): SetupInfo {
 export function confirmSetup(db: Db, userId: number, code: string): string[] {
   const user = userById(db, userId);
   if (!user.totp_secret) {
-    throw Object.assign(new Error('ابدئي الإعداد أولاً.'), { statusCode: 400 });
+    throw Object.assign(new Error('لم يبدأ الإعداد بعد.'), { statusCode: 400 });
   }
 
   const counter = verifyCode(user.totp_secret, code);
   if (counter === undefined) {
-    throw Object.assign(new Error('الرمز غير صحيح. تأكدي من وقت جوالك.'), { statusCode: 401 });
+    throw Object.assign(new Error('الرمز غير صحيح — يلزم التأكد من وقت الجوال.'), { statusCode: 401 });
   }
 
   const codes = newRecoveryCodes();
@@ -76,7 +76,7 @@ export function verifyLogin(db: Db, user: UserRow, code: string): void {
   if (counter !== undefined) {
     if (user.totp_last_counter !== null && counter <= user.totp_last_counter) {
       throw Object.assign(
-        new Error('هذا الرمز استُعمل. انتظري الرمز التالي.'),
+        new Error('هذا الرمز استُعمل — الرمز التالي بعد قليل.'),
         { statusCode: 401 },
       );
     }

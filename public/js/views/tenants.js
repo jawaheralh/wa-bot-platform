@@ -62,12 +62,12 @@ export async function renderTenants(main, onPick) {
     <div class="card" id="metaCard" hidden>
       <h3>بيانات Meta للمنشأة <span id="metaTenant"></span></h3>
       <p class="muted">
-        كل عميل له حساب واتساب أعمال خاص: رقمه وتطبيقه وتوكنه. اتركي الحقول
-        فارغة ليستعمل حسابك أنتِ، أو أدخلي بياناته ليعمل بحسابه.
+        كل عميل له حساب واتساب أعمال خاص: رقمه وتطبيقه وتوكنه. تُترك الحقول
+        فارغة ليستعمل حسابك أنت، أو تُدخَل بياناته ليعمل بحسابه.
       </p>
       <div class="row">
-        <div><label for="mToken">توكن Meta الدائم</label><input id="mToken" dir="ltr" placeholder="اتركيه لعدم التغيير"></div>
-        <div><label for="mSecret">المفتاح السري للتطبيق</label><input id="mSecret" dir="ltr" placeholder="اتركيه لعدم التغيير"></div>
+        <div><label for="mToken">توكن Meta الدائم</label><input id="mToken" dir="ltr" placeholder="بلا تغيير"></div>
+        <div><label for="mSecret">المفتاح السري للتطبيق</label><input id="mSecret" dir="ltr" placeholder="بلا تغيير"></div>
       </div>
       <div class="row">
         <div><label for="mAppId">معرّف التطبيق</label><input id="mAppId" dir="ltr"></div>
@@ -75,12 +75,12 @@ export async function renderTenants(main, onPick) {
         <div><label for="mPhoneId">معرّف الرقم (Phone number ID)</label><input id="mPhoneId" dir="ltr"></div>
       </div>
       <label for="mClaude">مفتاح Claude الخاص بالمنشأة</label>
-      <input id="mClaude" dir="ltr" placeholder="اتركيه لعدم التغيير">
+      <input id="mClaude" dir="ltr" placeholder="بلا تغيير">
       <p class="muted" style="margin:4px 0 12px">
         مفتاح خاص يعني أن رصيد هذا العميل ينفد وحده فلا يوقف بقية عملائك،
-        وأن تكلفته محسوبة عليه. اتركيه فارغاً ليستعمل مفتاحك.
-        <br>أنشئي في console.anthropic.com مساحة عمل لكل عميل وحدّدي لها
-        سقف إنفاق شهرياً، ثم ولّدي مفتاحاً بنطاقها.
+        وأن تكلفته محسوبة عليه. يُترك فارغاً ليستعمل مفتاحك.
+        <br>في console.anthropic.com تُنشأ مساحة عمل لكل عميل بسقف إنفاق
+        شهري، ثم يُولَّد مفتاح بنطاقها.
       </p>
       <div class="actions">
         <button class="btn" id="mSave">حفظ</button>

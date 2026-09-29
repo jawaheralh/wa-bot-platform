@@ -69,7 +69,7 @@ async function main(): Promise<void> {
   if (!me.ok) {
     console.log(bad(`التوكن مرفوض (${me.status}): ${metaError(me.data)}`));
     console.log(dim('     التوكن المؤقت من صفحة API Setup ينتهي خلال ٢٤ ساعة.'));
-    console.log(dim('     ولّدي توكناً دائماً من Business Settings ← System Users.'));
+    console.log(dim('     التوكن الدائم يُولَّد من Business Settings ← System Users.'));
     process.exit(1);
   }
   console.log(ok(`التوكن صالح — ${String(me.data.name ?? me.data.id ?? '')}`));
@@ -96,7 +96,7 @@ async function main(): Promise<void> {
 
     if (!number.ok) {
       console.log(bad(`معرّف الرقم مرفوض (${number.status}): ${metaError(number.data)}`));
-      console.log(dim('       تأكدي أن Phone number ID صحيح، وأن التوكن يملك صلاحية على هذا الرقم.'));
+      console.log(dim('       يلزم أن يكون Phone number ID صحيحاً، وأن يملك التوكن صلاحية على هذا الرقم.'));
       allGood = false;
       continue;
     }
@@ -136,8 +136,8 @@ async function main(): Promise<void> {
 
   console.log(
     allGood
-      ? green('\n✓ الربط سليم من جهة Meta. يبقى أن تربطي الـwebhook وتشغّلي: npm start\n')
-      : red('\n✗ راجعي النقاط أعلاه.\n'),
+      ? green('\n✓ الربط سليم من جهة Meta. يبقى ربط الـwebhook ثم: npm start\n')
+      : red('\n✗ النقاط أعلاه تحتاج مراجعة.\n'),
   );
 }
 
