@@ -201,6 +201,22 @@ describe('صفحة الهبوط عامة', () => {
     expect(String(response.json().name).length).toBeGreaterThan(0);
   });
 
+  /**
+   * الرقم الفارغ ليس تفصيلاً تجميلياً.
+   *
+   * كان هنا رقم عميل يُعرض لزوّار الصفحة على أنه رقم المنصة. وحين لا
+   * يوجد رقم يجب أن يختفي الزر، لا أن يفتح واتساب على رابط بلا رقم.
+   */
+  it('ولا يُعرض رقم دعم ما لم يُضبَط', async () => {
+    const response = await server.inject({ method: 'GET', url: '/api/brand' });
+    expect(response.json().supportWhatsapp).toBe('');
+  });
+
+  it('والأسئلة الشائعة لها موضعها في الصفحة', async () => {
+    const response = await server.inject({ method: 'GET', url: '/' });
+    expect(response.body).toContain('id="faqList"');
+  });
+
   it('واللوحة على /app لا على /', async () => {
     const panel = await server.inject({ method: 'GET', url: '/app' });
     expect(panel.statusCode).toBe(200);

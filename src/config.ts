@@ -163,7 +163,14 @@ export function loadConfig(): AppConfig {
     sessionSecret,
     logLevel,
     provider,
-    supportWhatsApp: str('SUPPORT_WHATSAPP', '966500000000').replace(/[^\d]/g, ''),
+    /**
+     * فارغ افتراضياً عن قصد.
+     *
+     * الرقم الوهمي في الكود لا يبقى وهمياً: يمرّ على الإعداد بلا
+     * انتباه ثم يُعرض لعميل على أنه رقم الدعم. وحين لا يوجد رقم
+     * تختفي أزرار التواصل كلها بدل أن تقود إلى رقم غريب.
+     */
+    supportWhatsApp: str('SUPPORT_WHATSAPP').replace(/[^\d]/g, ''),
     anthropicApiKey: str('ANTHROPIC_API_KEY'),
     anthropicModel: str('ANTHROPIC_MODEL', 'claude-sonnet-5'),
     transcription: {

@@ -73,6 +73,57 @@ const T = {
     copy: '© 2026 — جميع الحقوق محفوظة.',
     chatLabel: 'تحدثي مع المبيعات',
 
+    faqTitle: 'أسئلة يسألها كل من يجرّبها',
+    /**
+     * سؤال وجواب في مصفوفة لا في الترميز: العدد يتغيّر مع كل عميل
+     * يسأل شيئاً جديداً، وإضافة سطر هنا أسهل من تكرار قالب في ملفين.
+     */
+    faq: [
+      [
+        'من أين يأتي البوت بإجاباته؟',
+        'من معرفة منشأتك التي تكتبينها أنتِ — الأسعار والمواعيد والفروع والسياسات. ' +
+          'وإن لم يجد الجواب فيها لا يخترع، بل يحوّل المحادثة لموظف.',
+      ],
+      [
+        'هل يستغني عن موظف خدمة العملاء؟',
+        'لا. يتكفّل بالمتكرّر ويترك ما يحتاج إنساناً. وموظفك يرى كل محادثة ويتدخّل متى شاء — ' +
+          'وحين يكتب رداً يصمت البوت تلقائياً حتى لا يتعارض معه.',
+      ],
+      [
+        'كيف أحدّد ما يقوله وما لا يقوله؟',
+        'بملف إكسل واحد: ورقة للمعرفة، وورقة لحدود البوت، وورقة للفروع. ' +
+          'يُرفع بضغطة زر، وتعدّلينه من اللوحة في أي وقت.',
+      ],
+      [
+        'أين تُحفظ بيانات عملائي؟',
+        'على خادم داخل السعودية. الاتصال مشفّر، والدخول للوحة محصور بحسابات منشأتك، ' +
+          'والنسخ الاحتياطية تُشفَّر قبل أن تُخزَّن.',
+      ],
+      [
+        'هل أحتاج رقم واتساب جديد؟',
+        'لا، يعمل على رقم منشأتك نفسه عبر واتساب بزنس الرسمي من ميتا. يُربط مرة واحدة ويبقى.',
+      ],
+      [
+        'ماذا يحدث للشكوى بعد تسجيلها؟',
+        'تأخذ رقماً مرجعياً يصل العميل فوراً، وتظهر في اللوحة بحالتها. ' +
+          'وعند تغيّر الحالة يُبلَّغ العميل تلقائياً بلا تدخّل منك.',
+      ],
+      [
+        'هل تختلط بيانات منشأتي بغيرها؟',
+        'لا. رقم كل منشأة ومعرفتها وحساباتها ومحادثاتها منفصلة تماماً، ' +
+          'ولا يرى حسابُ منشأةٍ شيئاً من أخرى.',
+      ],
+      [
+        'وبقية قنوات التواصل؟',
+        'حالياً واتساب وحده — وهو ما نضمن جودته اليوم. والنظام مبني ليقبل إنستغرام ' +
+          'وماسنجر والبريد ودردشة الموقع في نفس اللوحة لاحقاً.',
+      ],
+      [
+        'كم التكلفة؟',
+        'تعتمد على حجم المحادثات وعدد الأرقام. اطلبي عرضاً تجريبياً ونرد عليك بالتفصيل خلال يوم عمل.',
+      ],
+    ],
+
     countries: ['السعودية', 'الإمارات', 'الكويت', 'قطر', 'البحرين', 'عُمان', 'مصر', 'الأردن', 'أخرى'],
     roles: [
       'مدير خدمة العملاء',
@@ -149,6 +200,55 @@ const T = {
     copy: '© 2026 — All rights reserved.',
     chatLabel: 'Chat with sales',
 
+    faqTitle: 'Questions everyone asks',
+    faq: [
+      [
+        'Where do the answers come from?',
+        'From the knowledge you write yourself — prices, hours, branches, policies. ' +
+          'If the answer is not there it does not invent one; it hands the conversation to a human.',
+      ],
+      [
+        'Does it replace my support agent?',
+        'No. It handles the repetitive questions and leaves the rest to people. Your agent sees every ' +
+          'conversation and can step in at any moment — and once they reply, the bot goes quiet on its own.',
+      ],
+      [
+        'How do I control what it says?',
+        'With one spreadsheet: a sheet for knowledge, a sheet for the bot\u2019s limits, and a sheet for ' +
+          'branches. Upload it with one button, and edit it from the dashboard whenever you like.',
+      ],
+      [
+        'Where is my customer data stored?',
+        'On a server inside Saudi Arabia. Traffic is encrypted, dashboard access is limited to your own ' +
+          'accounts, and backups are encrypted before they are stored.',
+      ],
+      [
+        'Do I need a new WhatsApp number?',
+        'No. It runs on your existing business number through Meta\u2019s official WhatsApp Business API. ' +
+          'You connect it once.',
+      ],
+      [
+        'What happens after a complaint is filed?',
+        'It gets a reference number sent to the customer immediately and appears in the dashboard with its ' +
+          'status. When the status changes, the customer is notified automatically.',
+      ],
+      [
+        'Can one business see another\u2019s data?',
+        'No. Each business has its own number, knowledge, accounts and conversations, fully separated — ' +
+          'one account can never reach another\u2019s data.',
+      ],
+      [
+        'What about other channels?',
+        'Today WhatsApp only — that is what we can stand behind. The system is built to take Instagram, ' +
+          'Messenger, email and website chat into the same inbox later.',
+      ],
+      [
+        'What does it cost?',
+        'It depends on conversation volume and how many numbers you connect. Request a demo and we will ' +
+          'come back to you with details within one business day.',
+      ],
+    ],
+
     countries: ['Saudi Arabia', 'UAE', 'Kuwait', 'Qatar', 'Bahrain', 'Oman', 'Egypt', 'Jordan', 'Other'],
     roles: [
       'Customer Service Manager',
@@ -186,6 +286,17 @@ function apply() {
       node.textContent = t[key];
     }
   }
+
+  // الأسئلة تُبنى لا تُترجَم بـdata-t: عددها يختلف ونصّها فقرتان.
+  document.getElementById('faqList').innerHTML = t.faq
+    .map(
+      ([question, answer], index) =>
+        `<details class="qa"${index === 0 ? ' open' : ''}>
+           <summary>${question}</summary>
+           <p>${answer}</p>
+         </details>`,
+    )
+    .join('');
 
   document.getElementById('lang').textContent = t.toggle;
   fill(document.getElementById('country'), t.countries);

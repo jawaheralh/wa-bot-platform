@@ -26,6 +26,9 @@
 
 html { scroll-behavior: smooth }
 
+/* الشريط العلوي لاصق، وبلا هذا يقف القسم تحته فيختفي عنوانه */
+section[id], div[id] { scroll-margin-top: 86px }
+
 body {
   margin: 0;
   background: var(--bg);
@@ -259,6 +262,51 @@ body[dir='ltr'] .accent { font-family: 'Playfair Display', serif }
   margin-top: 28px;
 }
 
+/* --- الأسئلة الشائعة --- */
+
+/**
+ * <details> لا جافاسكربت.
+ *
+ * الفتح والإغلاق سلوك أصيل في المتصفح: يعمل قبل تحميل أي سكربت،
+ * ويُقرأ بقارئ الشاشة، ويجده بحث الصفحة (Ctrl+F) حتى وهو مطوي في
+ * المتصفحات الحديثة.
+ */
+.faq { max-width: 820px; margin-inline: auto; margin-top: 8px }
+
+.qa {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(59, 34, 41, 0.07);
+  margin-bottom: 12px;
+  padding-inline: 24px;
+}
+
+.qa summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 17px;
+  padding-block: 18px;
+  padding-inline-end: 34px;
+  position: relative;
+  list-style: none;
+}
+.qa summary::-webkit-details-marker { display: none }
+
+.qa summary::after {
+  content: '+';
+  position: absolute;
+  inset-inline-end: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--accent);
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1;
+}
+.qa[open] summary::after { content: '−' }
+
+.qa p { margin: 0 0 20px; color: var(--muted); font-size: 16px }
+
 /* --- التذييل --- */
 
 .foot { background: var(--deep); color: rgba(255, 255, 255, 0.82); padding-block: 26px; margin-top: 40px }
@@ -302,6 +350,8 @@ body[dir='ltr'] .accent { font-family: 'Playfair Display', serif }
   .mock-body { grid-template-columns: 1fr }
   .mock-list { display: none }
   .card { padding: 24px }
+  .qa { padding-inline: 18px }
+  .qa summary { font-size: 16px }
 }
 
 /* --- الوصول --- */

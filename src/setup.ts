@@ -191,9 +191,11 @@ const FIELDS: Field[] = [
   },
   {
     key: 'SUPPORT_WHATSAPP',
-    label: 'رقم الدعم (رقمك أنتِ)',
-    hint: 'يظهر لعملائك عند الوحدات المعطّلة، بصيغة 9665xxxxxxxx.',
-    validate: (v) => (/^\d{10,15}$/.test(v.replace(/\D/g, '')) ? null : 'رقم غير صالح.'),
+    label: 'رقم الدعم (رقمك أنتِ) — اختياري',
+    hint: 'يظهر لعملائك عند الوحدات المعطّلة. اتركيه فارغاً حتى يكون لديك رقم خاص بالمنصة.',
+    optional: true,
+    validate: (v) =>
+      v.trim() === '' || /^\d{10,15}$/.test(v.replace(/\D/g, '')) ? null : 'رقم غير صالح.',
   },
   {
     key: 'OPENAI_API_KEY',

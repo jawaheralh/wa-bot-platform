@@ -127,9 +127,14 @@ function card(module, isSystemAdmin, supportWhatsApp) {
       <div class="locked">
         غير مفعّلة، تواصل معنا للتفعيل.
         <div class="actions">
-          <a class="btn small" href="https://wa.me/${esc(supportWhatsApp)}?text=${text}" target="_blank" rel="noopener">
-            تواصل معنا على واتساب
-          </a>
+          ${
+            // بلا رقم دعم لا يُعرض زر: رابط wa.me بلا رقم يفتح واتساب على فراغ.
+            supportWhatsApp
+              ? `<a class="btn small" href="https://wa.me/${esc(supportWhatsApp)}?text=${text}" target="_blank" rel="noopener">
+                   تواصل معنا على واتساب
+                 </a>`
+              : ''
+          }
           ${
             isSystemAdmin
               ? `<button class="btn ghost small" data-toggle="${esc(module.name)}" data-enabled="false">تفعيل (أدمن النظام)</button>`
