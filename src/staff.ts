@@ -12,6 +12,7 @@
  */
 
 import { normalizeNumber, type Db, type UserRow } from './db/index.ts';
+import { permissionsOf, normalizePermissions } from './permissions.ts';
 import { hashPassword } from './tenants.ts';
 
 export type Role = 'system' | 'tenant' | 'agent';
@@ -33,6 +34,7 @@ export interface StaffSummary {
   createdAt: string;
   /** عدد الردود التي كتبها، لأن الحذف ممنوع وهذا يفسّر سبب بقاء المعطَّل. */
   replies: number;
+  permissions: string[];
 }
 
 export function listStaff(db: Db, tenantId: number): StaffSummary[] {
@@ -52,6 +54,7 @@ export function listStaff(db: Db, tenantId: number): StaffSummary[] {
     active: row.active === 1,
     createdAt: row.created_at,
     replies: row.replies,
+    permissions: permissionsOf(row),
   }));
 }
 
@@ -62,6 +65,8 @@ export interface NewStaffInput {
   displayName?: string;
   waNumber?: string;
   role?: 'tenant' | 'agent';
+  /** صلاحيات الموظف. غيابها يعني الافتراضي. */
+  permissions?: string[];
 }
 
 export function addStaff(db: Db, input: NewStaffInput): StaffSummary {
@@ -74,8 +79,8 @@ export function addStaff(db: Db, input: NewStaffInput): StaffSummary {
 
   const info = db
     .prepare(
-      `INSERT INTO users (tenant_id, username, display_name, password_hash, role, wa_number, active)
-       VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      `INSERT INTO users (tenant_id, username, display_name, password_hash, role, wa_number, active, permissions)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
     )
     .run(
       input.tenantId,
@@ -84,6 +89,7 @@ export function addStaff(db: Db, input: NewStaffInput): StaffSummary {
       hashPassword(input.password),
       input.role ?? 'agent',
       input.waNumber ? normalizeNumber(input.waNumber) : null,
+      normalizePermissions(input.permissions),
     );
 
   return listStaff(db, input.tenantId).find((s) => s.id === Number(info.lastInsertRowid))!;
@@ -101,7 +107,14 @@ export function updateStaff(
   db: Db,
   tenantId: number,
   userId: number,
-  changes: { displayName?: string; waNumber?: string | null; role?: 'tenant' | 'agent'; active?: boolean; password?: string },
+  changes: {
+    displayName?: string;
+    waNumber?: string | null;
+    role?: 'tenant' | 'agent';
+    active?: boolean;
+    password?: string;
+    permissions?: string[];
+  },
 ): StaffSummary {
   const user = requireStaffOf(db, tenantId, userId);
 
@@ -127,7 +140,8 @@ export function updateStaff(
        display_name = COALESCE(?, display_name),
        wa_number    = CASE WHEN ? THEN ? ELSE wa_number END,
        role         = COALESCE(?, role),
-       active       = COALESCE(?, active)
+       active       = COALESCE(?, active),
+       permissions  = CASE WHEN ? THEN ? ELSE permissions END
      WHERE id = ?`,
   ).run(
     changes.displayName?.trim() || null,
@@ -135,6 +149,8 @@ export function updateStaff(
     changes.waNumber ? normalizeNumber(changes.waNumber) : null,
     changes.role ?? null,
     changes.active === undefined ? null : changes.active ? 1 : 0,
+    changes.permissions === undefined ? 0 : 1,
+    normalizePermissions(changes.permissions),
     userId,
   );
 

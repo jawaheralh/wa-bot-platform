@@ -12,6 +12,7 @@ import '@fastify/cookie';
 import type { Role } from '../staff.ts';
 import { findUser, verifyPassword } from '../tenants.ts';
 import type { Db, UserRow } from '../db/index.ts';
+import { can, PERMISSIONS } from '../permissions.ts';
 
 const COOKIE = 'wabot_session';
 
@@ -21,6 +22,8 @@ export interface SessionUser {
   displayName: string;
   role: Role;
   tenantId: number | null;
+  /** نصّ JSON كما في القاعدة — يُفكّ عند الفحص لا عند التحميل. */
+  permissions?: string | null;
 }
 
 declare module 'fastify' {
@@ -36,6 +39,7 @@ function toSession(user: UserRow): SessionUser {
     displayName: user.display_name,
     role: user.role,
     tenantId: user.tenant_id,
+    permissions: user.permissions ?? null,
   };
 }
 
@@ -166,6 +170,22 @@ export function requireTenantAccess(request: FastifyRequest, tenantId: number): 
   return tenantId;
 }
 
+
+/**
+ * فعلٌ يحتاج صلاحية بعينها داخل المنشأة.
+ *
+ * المالك وأدمن النظام يمرّان دائماً؛ الموظف يمرّ إن كان المفتاح في
+ * صلاحياته. والرسالة تسمّي الفعل الممنوع لا «ليس لديك صلاحية» —
+ * الموظف يحتاج أن يعرف ما يطلبه من مالكه.
+ */
+export function requirePermission(request: FastifyRequest, tenantId: number, key: string): number {
+  requireTenantAccess(request, tenantId);
+  const user = request.user!;
+  if (can(user, key)) return tenantId;
+
+  const info = PERMISSIONS.find((p) => p.key === key);
+  throw Object.assign(new Error(`صلاحية «${info?.label ?? key}» غير ممنوحة لحسابك.`), { statusCode: 403 });
+}
 
 /**
  * إدارة الموظفين وقاعدة المعرفة وإعدادات الوحدات لمالك المنشأة فقط.

@@ -141,6 +141,8 @@ export interface UserRow {
   totp_last_counter: number | null;
   /** رموز الاسترجاع مُجزّأة، JSON من مصفوفة نصوص. */
   recovery_hashes: string | null;
+  /** صلاحيات الموظف، JSON. الفارغ = افتراضي الدور. */
+  permissions: string | null;
   created_at: string;
 }
 

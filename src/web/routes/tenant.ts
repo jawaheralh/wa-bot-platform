@@ -36,6 +36,8 @@ import { listHandoffs, resolveHandoffs } from '../../modules/handoff.ts';
 import type { AppConfig } from '../../config.ts';
 import type { WhatsAppProvider } from '../../whatsapp/provider.ts';
 import { SQL_NOW } from '../../time.ts';
+import { requirePermission } from '../auth.ts';
+import { PERMISSIONS } from '../../permissions.ts';
 import { readBranding, saveColors, storeLogo, removeLogo, readLogo, paletteFor } from '../../branding.ts';
 import { readProfile, updateProfile, setPhoto, VERTICALS } from '../../wa-profile.ts';
 import { credentialsFor } from '../../tenant-meta.ts';
@@ -55,6 +57,13 @@ export function registerTenantRoutes(
     const id = Number((request.params as Params).tenantId);
     if (!Number.isFinite(id)) throw Object.assign(new Error('رقم منشأة غير صالح.'), { statusCode: 400 });
     return requireTenantAccess(request as never, id);
+  };
+
+  /** فعلٌ يحتاج صلاحية بعينها — المالك يمرّ دائماً. */
+  const allowed = (key: string) => (request: { params: unknown; user?: { role: string } }): number => {
+    const id = Number((request.params as Params).tenantId);
+    if (!Number.isFinite(id)) throw Object.assign(new Error('رقم منشأة غير صالح.'), { statusCode: 400 });
+    return requirePermission(request as never, id, key);
   };
 
   /** المالك وحده: الموظفون وقاعدة المعرفة وإعدادات الوحدات. */
@@ -204,7 +213,7 @@ export function registerTenantRoutes(
 
   /* --- إسناد المحادثة لموظف --- */
   app.post('/api/tenants/:tenantId/conversations/:conversationId/assign', async (request) => {
-    const id = tenantOf(request);
+    const id = allowed('assign')(request);
     const conversationId = Number((request.params as Params & { conversationId: string }).conversationId);
     const conversation = getConversation(db, conversationId);
     if (!conversation || conversation.tenant_id !== id) {
@@ -250,7 +259,7 @@ export function registerTenantRoutes(
   });
 
   app.post('/api/tenants/:tenantId/conversations/:conversationId/bot', async (request) => {
-    const id = tenantOf(request);
+    const id = allowed('bot')(request);
     const conversationId = Number((request.params as Params & { conversationId: string }).conversationId);
     const conversation = getConversation(db, conversationId);
     if (!conversation || conversation.tenant_id !== id) {
@@ -270,7 +279,7 @@ export function registerTenantRoutes(
 
   /** الموظف يرسل رسالة يدوية من اللوحة — يُسكت البوت تلقائياً. */
   app.post('/api/tenants/:tenantId/conversations/:conversationId/reply', async (request) => {
-    const id = tenantOf(request);
+    const id = allowed('reply')(request);
     const conversationId = Number((request.params as Params & { conversationId: string }).conversationId);
     const conversation = getConversation(db, conversationId);
     if (!conversation || conversation.tenant_id !== id) {
@@ -315,7 +324,7 @@ export function registerTenantRoutes(
   });
 
   app.patch('/api/tenants/:tenantId/complaints/:complaintId', async (request) => {
-    const id = tenantOf(request);
+    const id = allowed('cases')(request);
     const complaintId = Number((request.params as Params & { complaintId: string }).complaintId);
     const body = (request.body ?? {}) as { status?: Status; resolution?: string };
     if (!body.status) throw Object.assign(new Error('الحالة مطلوبة.'), { statusCode: 400 });
@@ -368,13 +377,13 @@ export function registerTenantRoutes(
   });
 
   app.post('/api/tenants/:tenantId/kb', async (request, reply) => {
-    const id = adminOf(request);
+    const id = allowed('knowledge')(request);
     const body = (request.body ?? {}) as { question?: string; answer?: string };
     return reply.code(201).send(addKbEntry(db, id, body.question ?? '', body.answer ?? ''));
   });
 
   app.patch('/api/tenants/:tenantId/kb/:entryId', async (request) => {
-    const id = adminOf(request);
+    const id = allowed('knowledge')(request);
     const entryId = Number((request.params as Params & { entryId: string }).entryId);
     const body = (request.body ?? {}) as { question?: string; answer?: string };
     updateKbEntry(db, id, entryId, body.question ?? '', body.answer ?? '');
@@ -382,7 +391,7 @@ export function registerTenantRoutes(
   });
 
   app.delete('/api/tenants/:tenantId/kb/:entryId', async (request) => {
-    const id = adminOf(request);
+    const id = allowed('knowledge')(request);
     deleteKbEntry(db, id, Number((request.params as Params & { entryId: string }).entryId));
     return { ok: true };
   });
@@ -404,7 +413,7 @@ export function registerTenantRoutes(
 
   /** جواب لسؤال ناقص: يُضاف للمعرفة ويُغلق السؤال في خطوة واحدة. */
   app.post('/api/tenants/:tenantId/gaps/:gapId/answer', async (request) => {
-    const id = adminOf(request);
+    const id = allowed('knowledge')(request);
     const gapId = Number((request.params as Params & { gapId: string }).gapId);
     const body = (request.body ?? {}) as { question?: string; answer?: string };
 
@@ -436,7 +445,7 @@ export function registerTenantRoutes(
   });
 
   app.patch('/api/tenants/:tenantId/gaps/:gapId', async (request) => {
-    const id = adminOf(request);
+    const id = allowed('knowledge')(request);
     const gapId = Number((request.params as Params & { gapId: string }).gapId);
     const status = (request.body as { status?: string })?.status;
     if (status !== 'open' && status !== 'ignored' && status !== 'answered') {
@@ -471,7 +480,12 @@ export function registerTenantRoutes(
   app.get('/api/tenants/:tenantId/staff', async (request) => {
     const id = tenantOf(request);
     // القائمة مرئية للجميع لأن الإسناد يحتاجها؛ التعديل وحده محصور بالمالك.
-    return { staff: listStaff(db, id), roles: ROLE_AR, canManage: request.user?.role !== 'agent' };
+    return {
+      staff: listStaff(db, id),
+      roles: ROLE_AR,
+      canManage: request.user?.role !== 'agent',
+      permissions: PERMISSIONS,
+    };
   });
 
   app.post('/api/tenants/:tenantId/staff', async (request, reply) => {
@@ -484,6 +498,9 @@ export function registerTenantRoutes(
       displayName: body.displayName,
       waNumber: body.waNumber,
       role: body.role === 'tenant' ? 'tenant' : 'agent',
+      permissions: Array.isArray((request.body as { permissions?: unknown }).permissions)
+        ? ((request.body as { permissions: string[] }).permissions)
+        : undefined,
     });
     return reply.code(201).send(staff);
   });
@@ -504,6 +521,7 @@ export function registerTenantRoutes(
       role: body.role === 'tenant' || body.role === 'agent' ? body.role : undefined,
       active: typeof body.active === 'boolean' ? body.active : undefined,
       password: typeof body.password === 'string' && body.password ? body.password : undefined,
+      permissions: Array.isArray(body.permissions) ? (body.permissions as string[]) : undefined,
     });
   });
 
@@ -869,7 +887,7 @@ export function registerTenantRoutes(
    * له محادثة لتُحفظ الرسالة في مكانها بدل أن تضيع بلا أثر.
    */
   app.post('/api/tenants/:tenantId/templates/send', async (request) => {
-    const id = tenantOf(request);
+    const id = allowed('templates')(request);
     if (!provider.sendTemplate) {
       throw Object.assign(new Error('المزوّد الحالي لا يدعم القوالب.'), { statusCode: 400 });
     }

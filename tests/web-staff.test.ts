@@ -118,10 +118,16 @@ describe('ما يستطيعه الموظف', () => {
 });
 
 describe('ما لا يستطيعه الموظف', () => {
-  it('لا يعدّل قاعدة المعرفة', async () => {
+  /**
+   * الرسالة تسمّي الصلاحية الناقصة لا «ليس لديك صلاحية».
+   *
+   * الموظف يقرؤها ثم يطلبها من مالكه بالاسم، بدل أن يتصل يسأل ما الذي
+   * يحتاجه — وهذه المكالمة تقع على المالك لا علينا.
+   */
+  it('لا يعدّل قاعدة المعرفة ما لم تُمنح له', async () => {
     const result = await as('mona', 'POST', '/api/tenants/1/kb', { question: 'س', answer: 'ج' });
     expect(result.status).toBe(403);
-    expect(String(result.body.error)).toContain('مالك المنشأة');
+    expect(String(result.body.error)).toContain('قاعدة المعرفة');
   });
 
   it('لا يغيّر إعدادات وحدة', async () => {

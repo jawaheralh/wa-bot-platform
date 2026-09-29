@@ -3,7 +3,7 @@
 import { get, post, patch, esc, guard, flash, state } from '../core.js';
 
 export async function renderStaff(main) {
-  const { staff, roles, canManage } = await get(`/api/tenants/${state.tenantId}/staff`);
+  const { staff, roles, permissions } = await get(`/api/tenants/${state.tenantId}/staff`);
   const isOwner = state.me.role === 'system' || state.me.role === 'tenant';
 
   main.innerHTML = `
@@ -12,7 +12,7 @@ export async function renderStaff(main) {
       ${staff.length} حساب ·
       ${
         isOwner
-          ? 'المالك يدير كل شيء، والموظف يرد على العملاء فقط ولا يعدّل المعرفة ولا الوحدات.'
+          ? 'المالك يملك كل الصلاحيات دائماً. والموظف يُمنح ما تختاره له وحده.'
           : 'هذه قائمة الفريق. الإضافة والتعديل لمالك المنشأة.'
       }
     </p>
@@ -20,7 +20,7 @@ export async function renderStaff(main) {
     <div class="card">
       <div class="table-wrap"><table>
         <thead><tr>
-          <th>الاسم</th><th>المستخدم</th><th>الصلاحية</th><th>رقم التنبيهات</th>
+          <th>الاسم</th><th>المستخدم</th><th>الدور</th><th>الصلاحيات</th><th>رقم التنبيهات</th>
           <th>ردود</th><th>الحالة</th>${isOwner ? '<th></th>' : ''}
         </tr></thead>
         <tbody>${staff
@@ -35,6 +35,15 @@ export async function renderStaff(main) {
                        <option value="tenant"${s.role === 'tenant' ? ' selected' : ''}>مالك المنشأة</option>
                      </select>`
                   : esc(roles[s.role] ?? s.role)
+              }</td>
+              <td>${
+                s.role === 'agent'
+                  ? `<span class="badge ${s.permissions.length ? 'grey' : 'red'}">${
+                      s.permissions.length
+                    } من ${permissions.length}</span>${
+                      isOwner ? ` <button class="btn ghost small" data-perm="${s.id}">تعديل</button>` : ''
+                    }`
+                  : '<span class="badge green">الكل</span>'
               }</td>
               <td>${
                 isOwner
@@ -67,6 +76,18 @@ export async function renderStaff(main) {
       </p>
     </div>
 
+    <div class="card" id="permCard" hidden>
+      <h3>صلاحيات <span id="permWho"></span></h3>
+      <p class="muted" style="margin-top:0">
+        ما لا يُؤشَّر هنا يُرفض من الخادم لا من الشاشة فقط.
+      </p>
+      <div id="permList"></div>
+      <div class="actions">
+        <button class="btn" id="permSave">حفظ الصلاحيات</button>
+        <button class="btn ghost" id="permClose">إغلاق</button>
+      </div>
+    </div>
+
     ${
       isOwner
         ? `<div class="card">
@@ -81,8 +102,19 @@ export async function renderStaff(main) {
               <div><label for="role">الصلاحية</label>
                 <select id="role"><option value="agent">موظف</option><option value="tenant">مالك المنشأة</option></select>
               </div>
-              <div style="flex:0 0 auto"><button class="btn" id="add">إضافة</button></div>
             </div>
+            <div id="newPerms">
+              <label>صلاحياته</label>
+              ${permissions
+                .map(
+                  (p) => `<label class="inline">
+                    <input type="checkbox" data-new-perm="${p.key}"${p.byDefault ? ' checked' : ''}>
+                    <span>${esc(p.label)} <span class="muted">— ${esc(p.hint)}</span></span>
+                  </label>`,
+                )
+                .join('')}
+            </div>
+            <div class="actions"><button class="btn" id="add">إضافة</button></div>
           </div>`
         : ''
     }
@@ -98,6 +130,7 @@ export async function renderStaff(main) {
       password: document.getElementById('password').value,
       waNumber: value('waNumber'),
       role: value('role'),
+      permissions: [...document.querySelectorAll('[data-new-perm]:checked')].map((box) => box.dataset.newPerm),
     });
     flash('أُضيف الموظف.');
     await renderStaff(main);
@@ -113,6 +146,44 @@ export async function renderStaff(main) {
       flash('حُفظ.');
       await renderStaff(main);
     });
+  });
+
+  /**
+   * الصلاحيات في بطاقة لا في خلية.
+   *
+   * ست خانات داخل صفّ جدول تُنتج صفاً بارتفاع شاشة، وقراءة شرح كل
+   * صلاحية أهم من اختصار نقرة.
+   */
+  const permCard = document.getElementById('permCard');
+  let editing = null;
+
+  main.querySelectorAll('[data-perm]').forEach((button) => {
+    button.onclick = () => {
+      editing = staff.find((s) => s.id === Number(button.dataset.perm));
+      document.getElementById('permWho').textContent = `«${editing.displayName}»`;
+      document.getElementById('permList').innerHTML = permissions
+        .map(
+          (p) => `<label class="inline">
+            <input type="checkbox" data-perm-key="${p.key}"${editing.permissions.includes(p.key) ? ' checked' : ''}>
+            <span>${esc(p.label)} <span class="muted">— ${esc(p.hint)}</span></span>
+          </label>`,
+        )
+        .join('');
+      permCard.hidden = false;
+      permCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+  });
+
+  document.getElementById('permClose').onclick = () => {
+    permCard.hidden = true;
+  };
+
+  document.getElementById('permSave').onclick = guard(async () => {
+    await patch(`/api/tenants/${state.tenantId}/staff/${editing.id}`, {
+      permissions: [...permCard.querySelectorAll('[data-perm-key]:checked')].map((box) => box.dataset.permKey),
+    });
+    flash('حُفظت الصلاحيات.');
+    await renderStaff(main);
   });
 
   main.querySelectorAll('[data-toggle]').forEach((button) => {
