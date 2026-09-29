@@ -40,45 +40,15 @@ export async function renderConversations(main) {
 
   main.innerHTML = `
     <h2>المحادثات</h2>
-    <p class="subtitle">${list.length} محادثة · الضغط على محادثة يعرضها ويتيح الرد فيها</p>
-    <div class="card">
-      ${
-        list.length
-          ? `<div class="table-wrap"><table>
-              <thead><tr>
-                <th>العميل</th><th>آخر رسالة</th><th>النشاط</th><th>المسؤول</th><th>البوت</th><th></th>
-              </tr></thead>
-              <tbody>${list
-                .map(
-                  (c) => `<tr>
-                    <td>${esc(c.customer_name || '—')}
-                      ${c.customer_city ? `<span class="badge grey">${esc(c.customer_city)}</span>` : ''}
-                      <br><span class="num muted">${esc(c.customer_wa)}</span></td>
-                    <td class="muted">${esc((c.last_body || '').slice(0, 70))}</td>
-                    <td class="muted">${esc(ago(c.last_message_at))}</td>
-                    <td>${
-                      c.assigned_name
-                        ? `<span class="badge ${c.assigned_to === state.me.id ? 'green' : 'grey'}">${esc(
-                            c.assigned_name,
-                          )}</span>`
-                        : '<span class="muted">—</span>'
-                    }</td>
-                    <td>${
-                      c.bot_enabled
-                        ? c.silent
-                          ? '<span class="badge amber">صامت مؤقتاً</span>'
-                          : '<span class="badge green">يعمل</span>'
-                        : '<span class="badge red">موقوف</span>'
-                    }</td>
-                    <td><button class="btn ghost small" data-open="${c.id}">فتح</button></td>
-                  </tr>`,
-                )
-                .join('')}</tbody>
-            </table></div>`
-          : '<div class="empty">لا توجد محادثات بعد.</div>'
-      }
+    <p class="subtitle">${list.length} محادثة · الأسماء على اليمين، والمحادثة على اليسار</p>
+    <div class="wa">
+      <aside class="wa-list" id="waList">
+        ${list.length ? list.map(listRow).join('') : '<div class="empty">لا توجد محادثات بعد.</div>'}
+      </aside>
+      <section class="wa-chat" id="thread">
+        <div class="wa-empty">اختيار محادثة من القائمة لعرضها والرد فيها.</div>
+      </section>
     </div>
-    <div id="thread"></div>
   `;
 
   main.querySelectorAll('[data-open]').forEach((button) => {
@@ -89,12 +59,38 @@ export async function renderConversations(main) {
    * المحادثة المفتوحة تُعاد بعد كل رسم.
    *
    * التحديث المباشر يُعيد رسم الشاشة كلما وصلت رسالة، فبلا هذا تُغلق
-   * المحادثة تحت يد الموظفة وهي تقرأها — وكلما زاد نشاط العملاء ساء
+   * المحادثة تحت يد الموظف وهو يقرأها — وكلما زاد نشاط العملاء ساء
    * الأمر، فتصير الميزة عائقاً.
    */
   if (state.openConversation && list.some((r) => r.id === state.openConversation)) {
     await openThread(state.openConversation, main, active);
   }
+}
+
+/** صف في قائمة الأسماء — سطران: الاسم والوقت، ثم مطلع آخر رسالة. */
+function listRow(c) {
+  const dots = [
+    c.bot_enabled
+      ? c.silent
+        ? '<span class="badge amber">صامت</span>'
+        : ''
+      : '<span class="badge red">البوت موقوف</span>',
+    c.assigned_name
+      ? `<span class="badge ${c.assigned_to === state.me.id ? 'green' : 'grey'}">${esc(c.assigned_name)}</span>`
+      : '',
+    c.customer_city ? `<span class="badge grey">${esc(c.customer_city)}</span>` : '',
+  ]
+    .filter(Boolean)
+    .join('');
+
+  return `<button class="wa-row${c.id === state.openConversation ? ' active' : ''}" data-open="${c.id}">
+    <div class="line">
+      <span class="name">${esc(c.customer_name || c.customer_wa)}</span>
+      <span class="when">${esc(ago(c.last_message_at))}</span>
+    </div>
+    <div class="last">${esc((c.last_body || '').slice(0, 60)) || '—'}</div>
+    ${dots ? `<div class="dots">${dots}</div>` : ''}
+  </button>`;
 }
 
 async function openThread(conversationId, main, staff) {
@@ -107,17 +103,42 @@ async function openThread(conversationId, main, staff) {
 
   const thread = document.getElementById('thread');
   thread.innerHTML = `
-    <div class="card">
+    <header class="wa-head">
       <h3>${esc(conversation.customer_name || conversation.customer_wa)}
         <span class="num muted" style="font-weight:400">${esc(conversation.customer_wa)}</span>
         ${channelBadge(conversation)}
         ${conversation.customer_city ? `<span class="badge grey">${esc(conversation.customer_city)}</span>` : ''}
         ${conversation.contact_phone ? `<span class="badge grey num">${esc(conversation.contact_phone)}</span>` : ''}
       </h3>
-      ${conversation.handoff_reason ? `<p class="muted">سبب آخر تحويل: ${esc(conversation.handoff_reason)}</p>` : ''}
+      ${conversation.handoff_reason ? `<p class="muted" style="margin:4px 0 0">سبب آخر تحويل: ${esc(conversation.handoff_reason)}</p>` : ''}
 
+      <div class="row">
+        <div style="max-width:240px">
+          <label for="assignee">المسؤول عن المحادثة</label>
+          <select id="assignee">
+            <option value="">— غير مُسندة —</option>
+            ${staff
+              .map(
+                (s) =>
+                  `<option value="${s.id}"${s.id === conversation.assigned_to ? ' selected' : ''}>${esc(
+                    s.displayName,
+                  )}</option>`,
+              )
+              .join('')}
+          </select>
+        </div>
+        <div style="flex:0 0 auto;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn ghost small" id="toggle">${conversation.bot_enabled ? 'إيقاف البوت' : 'تشغيل البوت'}</button>
+          <button class="btn ghost small" id="wake" hidden>إعادة البوت الآن</button>
+          <button class="btn ghost small" id="markTest" title="الموسوم وحده يُحذف بزر «حذف بيانات التجربة»">
+            ${conversation.is_test ? '✓ موسومة تجريبية' : 'وسم كتجربة'}
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="wa-body" id="waBody">
       ${silenceNotice(conversation)}
-
       ${
         viewer
           ? `<div class="error">⚠️ ${esc(viewer.display_name)} فتح هذه المحادثة قبل ${
@@ -132,24 +153,6 @@ async function openThread(conversationId, main, staff) {
             )}.</div>`
           : ''
       }
-
-      <div class="row" style="margin-bottom:10px">
-        <div>
-          <label for="assignee">المسؤول عن المحادثة</label>
-          <select id="assignee">
-            <option value="">— غير مُسندة —</option>
-            ${staff
-              .map(
-                (s) =>
-                  `<option value="${s.id}"${s.id === conversation.assigned_to ? ' selected' : ''}>${esc(
-                    s.displayName,
-                  )}</option>`,
-              )
-              .join('')}
-          </select>
-        </div>
-      </div>
-
       <div class="chat">${
         messages.length
           ? messages
@@ -163,25 +166,25 @@ async function openThread(conversationId, main, staff) {
               .join('')
           : '<div class="empty">لا رسائل.</div>'
       }</div>
+    </div>
 
+    <footer class="wa-foot">
       ${windowNotice(messages)}
       <div id="templateBox"></div>
-
       <label for="reply">رد يدوي (يُسكت البوت تلقائياً ويُسجَّل باسمك)</label>
       <textarea id="reply" placeholder="نص الرد للعميل…"></textarea>
-      <div class="actions">
-        <button class="btn" id="send">إرسال</button>
-        <button class="btn ghost" id="toggle">${conversation.bot_enabled ? 'إيقاف البوت' : 'تشغيل البوت'}</button>
-        <button class="btn ghost" id="wake" hidden>إعادة البوت الآن</button>
-        <button class="btn ghost" id="markTest" title="الموسوم وحده يُحذف بزر «حذف بيانات التجربة»">
-          ${conversation.is_test ? '✓ موسومة تجريبية' : 'وسم كتجربة'}
-        </button>
-      </div>
-    </div>
+      <div class="actions"><button class="btn" id="send">إرسال</button></div>
+    </footer>
   `;
-  thread.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  const chat = thread.querySelector('.chat');
-  chat.scrollTop = chat.scrollHeight;
+
+  // اللوح يفتح على آخر رسالة كما يفعل واتساب — لا على أول المحادثة.
+  const body = document.getElementById('waBody');
+  body.scrollTop = body.scrollHeight;
+
+  // الصف المفتوح يُميَّز في القائمة بعد أن تتغيّر المحادثة المعروضة.
+  document.querySelectorAll('.wa-row').forEach((row) => {
+    row.classList.toggle('active', Number(row.dataset.open) === conversationId);
+  });
 
   document.getElementById('assignee').onchange = guard(async (event) => {
     const value = event.target.value;
@@ -190,7 +193,6 @@ async function openThread(conversationId, main, staff) {
     });
     flash(value ? 'أُسندت المحادثة.' : 'رُفع الإسناد.');
     await renderConversations(main);
-    await openThread(conversationId, main, staff);
   });
 
   document.getElementById('send').onclick = guard(async () => {
@@ -199,7 +201,8 @@ async function openThread(conversationId, main, staff) {
     if (assignedToOther && !confirm(`هذه المحادثة مُسندة إلى ${assigneeName}. الإرسال على أي حال؟`)) return;
     await post(`/api/tenants/${state.tenantId}/conversations/${conversationId}/reply`, { text });
     flash('أُرسل الرد، والبوت صامت لساعتين.');
-    await openThread(conversationId, main, staff);
+    // إعادة الرسم لا فتح المحادثة وحدها: الرد يغيّر مطلع الصف ووسم الصمت.
+    await renderConversations(main);
   });
 
   document.getElementById('toggle').onclick = guard(async () => {
@@ -208,7 +211,6 @@ async function openThread(conversationId, main, staff) {
     });
     flash(conversation.bot_enabled ? 'أُوقف البوت لهذه المحادثة.' : 'عاد البوت للعمل.');
     await renderConversations(main);
-    await openThread(conversationId, main, staff);
   });
 
   /**
@@ -232,7 +234,6 @@ async function openThread(conversationId, main, staff) {
       await post(`/api/tenants/${state.tenantId}/conversations/${conversationId}/bot`, { enabled: true });
       flash('عاد البوت — سيرد على الرسالة القادمة.');
       await renderConversations(main);
-      await openThread(conversationId, main, staff);
     });
   }
 
@@ -245,7 +246,6 @@ async function openThread(conversationId, main, staff) {
     await post(`/api/tenants/${state.tenantId}/conversations/${conversationId}/test`, { isTest: next });
     flash(next ? 'وُسمت كتجربة — صارت قابلة للحذف من الإعداد.' : 'رُفع الوسم — لم تعد تُحذف.');
     await renderConversations(main);
-    await openThread(conversationId, main, staff);
   });
 }
 
@@ -410,7 +410,6 @@ async function renderTemplates(box, conversation, main, staff) {
     });
     flash('أُرسل القالب. ردّ العميل يفتح النافذة من جديد.');
     await renderConversations(main);
-    await openThread(conversation.id, main, staff);
   });
 }
 
