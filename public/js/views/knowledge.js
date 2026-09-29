@@ -15,6 +15,28 @@ export async function renderKnowledge(main) {
     <p class="subtitle">كل ما يكتب هنا يقوله البوت حرفياً. ما ليس هنا يقول عنه «ما أعرف» ويحوّل للموظف.</p>
 
     <div class="card">
+      <h3>تأسيس سريع بملف اكسل</h3>
+      <p class="muted" style="margin-top:0">
+        نزّلي الملف، أرسليه للعميل ليملأه على مهله، ثم ارفعيه هنا.
+        ثلاث أوراق: <strong>المعرفة</strong> (ما يجيب عنه البوت)،
+        <strong>الحدود</strong> (ما لا يجيب عنه أبداً)،
+        <strong>الفروع</strong>.
+      </p>
+      <div class="actions">
+        <a class="btn ghost" href="/api/tenants/${state.tenantId}/onboarding/template" download>
+          نزّلي ملف التأسيس
+        </a>
+        <button class="btn" id="pickFile">ارفعي الملف بعد ملئه</button>
+        <input id="xlsxFile" type="file" accept=".xlsx" hidden>
+      </div>
+      <p class="muted" style="margin-top:8px">
+        الرفع يُضيف ولا يحذف، والسؤال الموجود لا يتكرّر — فيمكن رفع
+        نسخة محدَّثة بلا خوف.
+      </p>
+      <div id="importResult"></div>
+    </div>
+
+    <div class="card">
       <h3>نص حر عن المنشأة</h3>
       <p class="muted">الخدمات والأسعار والموقع وساعات العمل — بأسلوبك.</p>
       <textarea id="freeText" style="min-height:160px">${esc(config.freeText)}</textarea>
@@ -81,5 +103,59 @@ export async function renderKnowledge(main) {
       await del(`/api/tenants/${state.tenantId}/kb/${button.dataset.del}`);
       await renderKnowledge(main);
     });
+  });
+
+  wireOnboarding(main, () => renderKnowledge(main));
+}
+
+
+/* ---------------------------------------------------------------
+   رفع ملف التأسيس
+--------------------------------------------------------------- */
+
+/**
+ * يُركَّب بعد رسم الشاشة.
+ *
+ * يُقرأ الملف في المتصفح ويُرسل base64: الرفع بـmultipart يحتاج
+ * ملحقاً في الخادم لمسار واحد، والملف هنا كيلوبايتات — نصوص لا صور.
+ */
+export function wireOnboarding(main, reload) {
+  const picker = main.querySelector('#xlsxFile');
+  const button = main.querySelector('#pickFile');
+  const box = main.querySelector('#importResult');
+  if (!picker || !button) return;
+
+  button.onclick = () => picker.click();
+
+  picker.onchange = guard(async () => {
+    const file = picker.files?.[0];
+    if (!file) return;
+
+    button.disabled = true;
+    button.textContent = 'جارٍ القراءة…';
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+        reader.onerror = () => reject(new Error('تعذّرت قراءة الملف.'));
+        reader.readAsDataURL(file);
+      });
+
+      const result = await post(`/api/tenants/${state.tenantId}/onboarding/import`, { file: base64 });
+
+      box.innerHTML = `
+        <div class="warn-box" style="background:#eef7f0;border-color:#cfe6d6">
+          ✅ أُضيف <strong>${result.added}</strong> مدخلاً.
+          ${result.skipped ? `تُخطّي ${result.skipped} صفاً (فارغ أو مكرر أو مثال).` : ''}
+          ${result.notes?.length ? `<p class="muted" style="margin:6px 0 0">${result.notes.map(esc).join('<br>')}</p>` : ''}
+        </div>`;
+
+      if (result.added > 0) await reload();
+    } finally {
+      // يُصفَّر دائماً وإلا تعذّر رفع الملف نفسه مرة أخرى بعد تصحيحه.
+      picker.value = '';
+      button.disabled = false;
+      button.textContent = 'ارفعي الملف بعد ملئه';
+    }
   });
 }

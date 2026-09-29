@@ -612,6 +612,58 @@ export function registerTenantRoutes(
     return reply;
   });
 
+  /* ---------------------------------------------------------------
+     ملف التأسيس — يملؤه العميل ويُرفع بضغطة
+  --------------------------------------------------------------- */
+
+  /** تنزيل الملف الفارغ بالتعليمات والأمثلة. */
+  app.get('/api/tenants/:tenantId/onboarding/template', async (request, reply) => {
+    const id = tenantOf(request);
+    const tenant = getTenant(db, id);
+    if (!tenant) throw Object.assign(new Error('المنشأة غير موجودة.'), { statusCode: 404 });
+
+    const { buildTemplate } = await import('../../onboarding.ts');
+    const file = buildTemplate(tenant);
+
+    // الاسم يحمل اسم المنشأة: ملفات عدة عملاء تجتمع في مجلد التنزيلات.
+    const safe = tenant.name.replace(/[^\p{L}\p{N} _-]/gu, '').trim() || 'المنشأة';
+    return reply
+      .header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      .header('content-disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`تأسيس-${safe}.xlsx`)}`)
+      .send(file);
+  });
+
+  /**
+   * رفع الملف بعد ملئه.
+   *
+   * الحمولة base64 لا multipart: الأخير يحتاج ملحقاً إضافياً لمسار
+   * واحد، والملفات هنا كيلوبايتات — نصوص لا صور.
+   */
+  app.post('/api/tenants/:tenantId/onboarding/import', async (request) => {
+    const id = adminOf(request);
+    const body = (request.body ?? {}) as { file?: string };
+    const raw = String(body.file ?? '');
+    if (!raw) throw Object.assign(new Error('لم يصل أي ملف.'), { statusCode: 400 });
+
+    const buffer = Buffer.from(raw.replace(/^data:[^,]*,/, ''), 'base64');
+    if (buffer.length === 0) throw Object.assign(new Error('الملف فارغ.'), { statusCode: 400 });
+    if (buffer.length > 5_000_000) {
+      throw Object.assign(new Error('الملف أكبر من ٥ ميجا — تأكدي أنه ملف التأسيس.'), { statusCode: 400 });
+    }
+
+    const { importWorkbook } = await import('../../onboarding.ts');
+    const result = importWorkbook(db, id, buffer);
+
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username ?? '',
+      action: 'kb_change',
+      ip: request.ip,
+    });
+    return result;
+  });
+
   /* --- التنبيهات --- */
   app.get('/api/tenants/:tenantId/alerts', async (request) => {
     const id = tenantOf(request);
