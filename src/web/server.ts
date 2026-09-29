@@ -32,7 +32,20 @@ import { audit } from '../compliance.ts';
 export async function createServer(app: App): Promise<FastifyInstance> {
   const { db, config, logger, provider, notify } = app;
 
-  const server = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024 });
+  /**
+   * الثقة بالوكيل المحلي وحده.
+   *
+   * Caddy يتصل من 127.0.0.1، فبدون هذا يصير عنوان كل زائر 127.0.0.1:
+   * حدّ محاولات الدخول يتحول إلى عدّاد واحد للعالم كله — يقفله مهاجم
+   * فيُمنع كل الموظفين — و request.protocol يصير http فتُرسل كوكي
+   * الجلسة بلا علامة secure. والثقة مقصورة على الحلقة المحلية حتى لا
+   * ينتحل زائر عنواناً برأس X-Forwarded-For.
+   */
+  const server = Fastify({
+    logger: false,
+    bodyLimit: 2 * 1024 * 1024,
+    trustProxy: '127.0.0.1',
+  });
   // فحص الصحة يحتاج التطبيق كاملاً (المزوّد والإعدادات)، لا القاعدة وحدها.
   server.decorate('appRef', app);
 
@@ -90,12 +103,20 @@ export async function createServer(app: App): Promise<FastifyInstance> {
 
       const path = (request.url.split('?')[0] ?? '').toLowerCase();
       if (path.startsWith('/webhook/')) return;
+      // فتح اللوحة على الإنترنت قرار صريح بمتغيّر مستقل: بدونه لا يصلها
+      // الموظفون إلا عبر نفق، ومعه تحرسها كلمة المرور وحدّ المحاولات
+      // والكوكي الموقّعة. المتغيّر يجعل الفتح فعلاً مقصوداً لا سهواً.
+      if (config.publicPanel) return;
 
       logger.warn('طلب مرفوض من العنوان العام', { مسار: path, مصدر: request.ip });
       await reply.code(404).send({ error: 'غير موجود.' });
     });
 
-    logger.info(`العنوان العام مقصور على /webhook — لوحة التحكم على ${config.host}:${config.port} فقط`);
+    logger.info(
+      config.publicPanel
+        ? `اللوحة مفتوحة على ${config.publicUrl} — تحرسها كلمة المرور وحدّ المحاولات`
+        : `العنوان العام مقصور على /webhook — لوحة التحكم على ${config.host}:${config.port} فقط`,
+    );
   }
 
   server.get('/api/health', async () => ({ ok: true, provider: provider.name }));

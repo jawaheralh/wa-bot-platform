@@ -170,3 +170,11 @@ export function recordLoginFailure(key: string): void {
 export function clearLoginFailures(key: string): void {
   attempts.delete(key);
 }
+
+/**
+ * العدّاد حالة على مستوى الوحدة، فملفات الاختبار في العملية الواحدة
+ * ترث محاولات بعضها الفاشلة ويسقط ملف سليم بـ٤٢٩ لذنب غيره.
+ */
+export function resetLoginRate(): void {
+  attempts.clear();
+}
