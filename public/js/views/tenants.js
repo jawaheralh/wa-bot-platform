@@ -34,6 +34,14 @@ export async function renderTenants(main, onPick) {
               <td class="num">${t.conversations}</td>
               <td class="num">${t.usage?.replies ?? 0}${
                 t.usage?.failures ? ` <span class="badge red">${t.usage.failures} فشل</span>` : ''
+              }${
+                t.cost?.actual
+                  ? `<br><span class="muted num">${(t.cost.actual * 3.75).toFixed(2)} ر.س</span>${
+                      t.cost.savedPercent > 0
+                        ? ` <span class="badge green">وفّر ${t.cost.savedPercent}٪</span>`
+                        : ''
+                    }`
+                  : ''
               }</td>
               <td>${
                 t.hasOwnMeta ? '<span class="badge green">خاص</span>' : '<span class="badge grey">حسابك</span>'

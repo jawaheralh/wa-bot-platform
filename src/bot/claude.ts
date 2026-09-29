@@ -26,13 +26,23 @@ export interface ModelReply {
   toolCalls: { id: string; name: string; input: Record<string, unknown> }[];
   stopReason: string | null;
   raw: ContentBlock[];
+  cache?: CacheUsage;
 }
 
 export interface ChatRequest {
+  /** الجزء الثابت — يُخزَّن مؤقتاً. */
   system: string;
+  /** الجزء المتغيّر (الوقت، المرفقات) — بعد نقطة التخزين. */
+  systemVolatile?: string;
   messages: ChatMessage[];
   tools: ToolDefinition[];
   maxTokens?: number;
+}
+
+export interface CacheUsage {
+  created: number;
+  read: number;
+  uncached: number;
 }
 
 /** الواجهة التي يعتمد عليها المحرّك — تُستبدل بـmock في الاختبارات. */
@@ -54,14 +64,25 @@ export function createClaudeClient(apiKey: string, model: string, logger: Logger
   const anthropic = new Anthropic({ apiKey });
 
   return {
-    async chat({ system, messages, tools, maxTokens = 1024 }) {
+    async chat({ system, systemVolatile, messages, tools, maxTokens = 1024 }) {
+      /**
+       * ترتيب التخزين: tools ← system ← messages.
+       *
+       * نقطة التخزين توضع على آخر كتلة ثابتة، فيُخزَّن كل ما قبلها:
+       * الأدوات والشخصية ومعرفة المنشأة — وهي ~٩٥٪ من الإدخال ولا تتغيّر
+       * بين رسالة وأخرى. القراءة من التخزين بعُشر السعر.
+       */
+      const systemBlocks: Anthropic.TextBlockParam[] = [
+        { type: 'text', text: system, cache_control: { type: 'ephemeral' } },
+      ];
+      if (systemVolatile) systemBlocks.push({ type: 'text', text: systemVolatile });
       const response = await withRetry(
         async () => {
           try {
             return await anthropic.messages.create({
               model,
               max_tokens: maxTokens,
-              system,
+              system: systemBlocks,
               messages: messages as Anthropic.MessageParam[],
               ...(tools.length ? { tools: tools as Anthropic.Tool[] } : {}),
             });
@@ -91,7 +112,23 @@ export function createClaudeClient(apiKey: string, model: string, logger: Logger
         )
         .map((b) => ({ id: b.id, name: b.name, input: b.input ?? {} }));
 
-      return { text, toolCalls, stopReason: response.stop_reason ?? null, raw: blocks };
+      const usage = response.usage as {
+        cache_creation_input_tokens?: number;
+        cache_read_input_tokens?: number;
+        input_tokens?: number;
+      };
+
+      return {
+        text,
+        toolCalls,
+        stopReason: response.stop_reason ?? null,
+        raw: blocks,
+        cache: {
+          created: usage.cache_creation_input_tokens ?? 0,
+          read: usage.cache_read_input_tokens ?? 0,
+          uncached: usage.input_tokens ?? 0,
+        },
+      };
     },
   };
 }

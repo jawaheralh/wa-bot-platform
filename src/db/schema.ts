@@ -129,6 +129,10 @@ export const CORE_TABLES: string[] = [
     replies    INTEGER NOT NULL DEFAULT 0,    -- ردود البوت
     tool_calls INTEGER NOT NULL DEFAULT 0,
     failures   INTEGER NOT NULL DEFAULT 0,
+    -- توكنات الإدخال: المقروء من التخزين بعُشر السعر، والمكتوب بضعف وربع
+    cache_read    INTEGER NOT NULL DEFAULT 0,
+    cache_written INTEGER NOT NULL DEFAULT 0,
+    uncached      INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (tenant_id, month)
   )`,
 
@@ -193,4 +197,7 @@ export const CORE_COLUMNS: [table: string, column: string, definition: string][]
   ['tenants', 'wa_business_id', 'TEXT'],
   ['tenants', 'anthropic_api_key', 'TEXT'],
   ['tenants', 'anthropic_model', 'TEXT'],
+  ['usage_log', 'cache_read', 'INTEGER NOT NULL DEFAULT 0'],
+  ['usage_log', 'cache_written', 'INTEGER NOT NULL DEFAULT 0'],
+  ['usage_log', 'uncached', 'INTEGER NOT NULL DEFAULT 0'],
 ];

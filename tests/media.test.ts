@@ -143,9 +143,11 @@ describe('من المحرّك', () => {
       },
     });
 
-    expect(claude.requests[0]!.system).toContain('أرسل العميل ملف');
-    expect(claude.requests[0]!.system).toContain('فاتورة.pdf');
-    expect(claude.requests[0]!.system).toContain('لا تدّعِ أنك اطّلعت عليه');
+    // إشعار المرفق في الجزء المتغيّر: يخص هذه الرسالة وحدها ولا يُخزَّن
+    expect(claude.requests[0]!.systemVolatile).toContain('أرسل العميل ملف');
+    expect(claude.requests[0]!.systemVolatile).toContain('فاتورة.pdf');
+    expect(claude.requests[0]!.systemVolatile).toContain('لا تدّعِ أنك اطّلعت عليه');
+    expect(claude.requests[0]!.system).not.toContain('فاتورة.pdf');
     expect(provider.outbox.some((m) => m.to === '966555123456')).toBe(true);
   });
 

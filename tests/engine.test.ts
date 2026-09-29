@@ -97,10 +97,22 @@ describe('المسار الأساسي', () => {
     expect(harness.claude.requests[1]?.system).toContain('أسلوبك ودّي');
   });
 
-  it('الوقت الحالي بتوقيت الرياض يُحقن في الـprompt', async () => {
+  it('الوقت في الجزء المتغيّر لا الثابت — وإلا أبطل التخزين في كل رسالة', async () => {
     harness = await setup([{ text: 'تم' }]);
     await harness.send('كم الساعة؟');
-    expect(harness.claude.requests[0]?.system).toMatch(/الساعة الآن \d{2}:\d{2} (صباحاً|ظهراً|مساءً|ليلاً) بتوقيت الرياض/);
+
+    const request = harness.claude.requests[0]!;
+    expect(request.systemVolatile).toMatch(/الساعة \d{2}:\d{2} (صباحاً|ظهراً|مساءً|ليلاً) بتوقيت الرياض/);
+    // المحك: لا أثر للوقت في الجزء المخزَّن
+    expect(request.system).not.toMatch(/\d{2}:\d{2}/);
+  });
+
+  it('الجزء الثابت لا يتغيّر بين رسالتين من نفس المنشأة', async () => {
+    harness = await setup([{ text: 'تم' }]);
+    await harness.send('أول');
+    await harness.send('ثاني');
+
+    expect(harness.claude.requests[0]!.system).toBe(harness.claude.requests[1]!.system);
   });
 });
 

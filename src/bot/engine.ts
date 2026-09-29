@@ -20,11 +20,11 @@ import {
   type TenantRow,
 } from '../db/index.ts';
 import { composePrompt, composeTools, dispatchTool, enabledFor } from '../modules/registry.ts';
-import { basePrompt, FALLBACK_REPLY, VOICE_DISABLED_REPLY } from './prompt.ts';
+import { basePrompt, volatilePrompt, FALLBACK_REPLY, VOICE_DISABLED_REPLY } from './prompt.ts';
 import { buildHistory } from './history.ts';
 import { now } from '../time.ts';
 import { recordGap } from '../training.ts';
-import { claudeFor, recordUsage } from '../tenant-claude.ts';
+import { claudeFor, recordUsage, recordCache } from '../tenant-claude.ts';
 import type { Transcriber } from '../stt/index.ts';
 import { storeMedia, isVisionImage, MAX_BYTES } from '../media.ts';
 import { MEDIA_AR } from '../whatsapp/provider.ts';
@@ -186,15 +186,25 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
     if (resolved) convLogger.debug('استعمال مفتاح Claude الخاص بالمنشأة');
 
     const enabled = enabledFor(db, tenant.id);
-    const attachmentNote =
-      media && !visionImage
-        ? `\n\n## ملف من العميل\nأرسل العميل ${MEDIA_AR[media.kind]}${
-            media.filename ? ` باسم «${media.filename}»` : ''
-          }. لا تستطيع فتحه، لكنه محفوظ ويراه الموظف في اللوحة.\nأقرّ باستلامه، واسأل العميل عمّا فيه إن احتجت، ولا تدّعِ أنك اطّلعت عليه.`
-        : '';
+    /**
+     * الـprompt مقسوم قسمين لأجل التخزين المؤقت:
+     *
+     * الثابت — الشخصية والمعرفة والأدوات — يُخزَّن لدى Anthropic ويُقرأ
+     * بعُشر السعر. والمتغيّر — الوقت وإشعار المرفق — بعد نقطة التخزين
+     * فلا يُبطله تغيّره. الفصل يوفّر ~٨٠٪ من تكلفة الإدخال.
+     */
+    const system = [basePrompt(tenant), composePrompt(enabled, base)].filter(Boolean).join('\n\n');
 
-    const system =
-      [basePrompt(tenant, nowSql), composePrompt(enabled, base)].filter(Boolean).join('\n\n') + attachmentNote;
+    const systemVolatile = [
+      volatilePrompt(nowSql),
+      media && !visionImage
+        ? `أرسل العميل ${MEDIA_AR[media.kind]}${media.filename ? ` باسم «${media.filename}»` : ''}. ` +
+          'لا تستطيع فتحه، لكنه محفوظ ويراه الموظف في اللوحة. أقرّ باستلامه، ' +
+          'واسأل العميل عمّا فيه إن احتجت، ولا تدّعِ أنك اطّلعت عليه.'
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
     const tools = composeTools(enabled, base);
     const messages: ChatMessage[] = buildHistory(db, conversation.id, config.historyLimit);
 
@@ -222,7 +232,16 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
 
     try {
       for (let round = 1; round <= MAX_TOOL_ROUNDS; round++) {
-        const result = await model.chat({ system, messages, tools });
+        const result = await model.chat({ system, systemVolatile, messages, tools });
+
+        if (result.cache) {
+          convLogger.debug('التخزين المؤقت', {
+            مقروء: result.cache.read,
+            مكتوب: result.cache.created,
+            بلا_تخزين: result.cache.uncached,
+          });
+          recordCache(db, tenant.id, result.cache);
+        }
 
         if (result.toolCalls.length === 0) {
           reply = result.text;

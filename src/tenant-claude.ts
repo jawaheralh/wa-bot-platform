@@ -65,21 +65,78 @@ export interface UsageRow {
   replies: number;
   tool_calls: number;
   failures: number;
+  cache_read: number;
+  cache_written: number;
+  uncached: number;
+}
+
+/** يسجّل توكنات الإدخال مفصّلة — منها يُحسب الوفر الفعلي للتخزين. */
+export function recordCache(
+  db: Db,
+  tenantId: number,
+  cache: { read: number; created: number; uncached: number },
+): void {
+  const month = today().slice(0, 7);
+  db.prepare(
+    `INSERT INTO usage_log (tenant_id, month, cache_read, cache_written, uncached)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(tenant_id, month) DO UPDATE SET
+       cache_read = cache_read + ?, cache_written = cache_written + ?, uncached = uncached + ?`,
+  ).run(tenantId, month, cache.read, cache.created, cache.uncached, cache.read, cache.created, cache.uncached);
 }
 
 export function usageFor(db: Db, tenantId: number, months = 12): UsageRow[] {
   return db
-    .prepare('SELECT month, replies, tool_calls, failures FROM usage_log WHERE tenant_id = ? ORDER BY month DESC LIMIT ?')
+    .prepare('SELECT * FROM usage_log WHERE tenant_id = ? ORDER BY month DESC LIMIT ?')
     .all(tenantId, months) as UsageRow[];
 }
 
 export function usageThisMonth(db: Db, tenantId: number): UsageRow {
   const month = today().slice(0, 7);
   return (
-    (db
-      .prepare('SELECT month, replies, tool_calls, failures FROM usage_log WHERE tenant_id = ? AND month = ?')
-      .get(tenantId, month) as UsageRow | undefined) ?? { month, replies: 0, tool_calls: 0, failures: 0 }
+    (db.prepare('SELECT * FROM usage_log WHERE tenant_id = ? AND month = ?').get(tenantId, month) as
+      | UsageRow
+      | undefined) ?? { month, replies: 0, tool_calls: 0, failures: 0, cache_read: 0, cache_written: 0, uncached: 0 }
   );
 }
 
 export { SQL_NOW };
+
+
+/* ---------------------------------------------------------------
+   التكلفة
+--------------------------------------------------------------- */
+
+/** أسعار Sonnet 5 لكل مليون توكن إدخال. */
+const PRICE_PER_M = 2;
+const WRITE_MULTIPLIER = 1.25;
+const READ_MULTIPLIER = 0.1;
+
+export interface CostEstimate {
+  /** التكلفة الفعلية بالدولار — الإدخال وحده. */
+  actual: number;
+  /** ما كانت ستكون بلا تخزين مؤقت. */
+  withoutCache: number;
+  /** نسبة الوفر المئوية. */
+  savedPercent: number;
+}
+
+/**
+ * تقدير تكلفة الإدخال من عدّادات التخزين.
+ *
+ * الإدخال وحده — الإخراج قصير (ردّ واتساب) وتقديره يحتاج عدّه، وإدراج
+ * رقم غير مقيس يُفسد الغرض من هذا الحساب.
+ */
+export function estimateInputCost(usage: UsageRow): CostEstimate {
+  const actualTokens = usage.cache_read * READ_MULTIPLIER + usage.cache_written * WRITE_MULTIPLIER + usage.uncached;
+  const plainTokens = usage.cache_read + usage.cache_written + usage.uncached;
+
+  const actual = (actualTokens * PRICE_PER_M) / 1e6;
+  const withoutCache = (plainTokens * PRICE_PER_M) / 1e6;
+
+  return {
+    actual,
+    withoutCache,
+    savedPercent: plainTokens > 0 ? Math.round((1 - actual / withoutCache) * 100) : 0,
+  };
+}

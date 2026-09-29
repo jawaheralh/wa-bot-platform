@@ -142,6 +142,7 @@ export function mockClaude(turns: ScriptedTurn[]): MockClaude {
         text: turn.text ?? '',
         toolCalls,
         stopReason: toolCalls.length ? 'tool_use' : 'end_turn',
+        cache: { created: 0, read: 0, uncached: 0 },
         raw: [
           ...(turn.text ? [{ type: 'text' as const, text: turn.text }] : []),
           ...toolCalls.map((c) => ({ type: 'tool_use' as const, id: c.id, name: c.name, input: c.input })),

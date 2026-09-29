@@ -12,7 +12,7 @@ import { listTenants, getTenant, normalizeNumber, type Db } from '../../db/index
 import type { AppConfig } from '../../config.ts';
 import { setEnabled, statusFor } from '../../modules/registry.ts';
 import { readEnvFile, writeEnvFile, maskSecret } from '../../env-file.ts';
-import { usageThisMonth, usageFor, forgetClaudeCache } from '../../tenant-claude.ts';
+import { usageThisMonth, usageFor, forgetClaudeCache, estimateInputCost } from '../../tenant-claude.ts';
 import { randomBytes } from 'node:crypto';
 import type { WhatsAppProvider } from '../../whatsapp/provider.ts';
 
@@ -45,6 +45,7 @@ export function registerSystemRoutes(
         waAppSecretMasked: maskSecret(wa_app_secret ?? ''),
         anthropicKeyMasked: maskSecret(anthropic_api_key ?? ''),
         usage: usageThisMonth(db, tenant.id),
+        cost: estimateInputCost(usageThisMonth(db, tenant.id)),
         ...counts,
         modules: statusFor(db, tenant.id).map((m) => ({ name: m.name, titleAr: m.titleAr, core: m.core, enabled: m.enabled })),
         connection: provider.status(tenant.id),
@@ -127,7 +128,8 @@ export function registerSystemRoutes(
   app.get('/api/system/tenants/:id/usage', async (request) => {
     requireSystemAdmin(request);
     const id = Number((request.params as { id: string }).id);
-    return { usage: usageFor(db, id) };
+    const usage = usageFor(db, id);
+    return { usage: usage.map((u) => ({ ...u, cost: estimateInputCost(u) })) };
   });
 
   /** تفعيل أو تعطيل وحدة لمنشأة — أدمن النظام فقط. */

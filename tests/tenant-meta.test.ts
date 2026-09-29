@@ -217,3 +217,47 @@ describe('المحرّك يحترم العميل المُمرَّر', () => {
     expect(provider.outbox[0]?.text).toBe('من العميل المحقون');
   });
 });
+
+describe('تقدير التكلفة والوفر', () => {
+  it('الوفر يُحسب من عدّادات التخزين الحقيقية', async () => {
+    const { estimateInputCost } = await import('../src/tenant-claude.ts');
+
+    // ما قِيس فعلياً: كتابة مرة، ثم ثلاث قراءات
+    const cost = estimateInputCost({
+      month: '2026-09',
+      replies: 4,
+      tool_calls: 0,
+      failures: 0,
+      cache_written: 7019,
+      cache_read: 7019 * 3,
+      uncached: 535,
+    });
+
+    expect(cost.actual).toBeLessThan(cost.withoutCache);
+    expect(cost.savedPercent).toBeGreaterThan(50);
+  });
+
+  it('بلا استهلاك: صفر بلا قسمة على صفر', async () => {
+    const { estimateInputCost } = await import('../src/tenant-claude.ts');
+    const cost = estimateInputCost({
+      month: '2026-09', replies: 0, tool_calls: 0, failures: 0,
+      cache_written: 0, cache_read: 0, uncached: 0,
+    });
+    expect(cost.actual).toBe(0);
+    expect(cost.savedPercent).toBe(0);
+  });
+
+  it('الوفر يزيد كلما كثرت القراءات — الكتابة تُستهلك مرة', async () => {
+    const { estimateInputCost } = await import('../src/tenant-claude.ts');
+    const few = estimateInputCost({
+      month: '2026-09', replies: 2, tool_calls: 0, failures: 0,
+      cache_written: 7000, cache_read: 7000, uncached: 260,
+    });
+    const many = estimateInputCost({
+      month: '2026-09', replies: 50, tool_calls: 0, failures: 0,
+      cache_written: 7000, cache_read: 7000 * 49, uncached: 6500,
+    });
+    expect(many.savedPercent).toBeGreaterThan(few.savedPercent);
+    expect(many.savedPercent).toBeGreaterThan(80);
+  });
+});
