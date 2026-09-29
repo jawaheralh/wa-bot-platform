@@ -381,7 +381,7 @@ describe('الرسائل الصوتية', () => {
     await provider.receive({
       toNumber: '966500000001',
       from: '966555555555',
-      audio: { mimeType: 'audio/ogg', download: async () => Buffer.from('') },
+      media: { kind: 'audio', mimeType: 'audio/ogg', download: async () => Buffer.from('') },
     });
 
     expect(provider.outbox[0]?.text).toContain('ما أقدر أسمع الرسائل الصوتية');
@@ -401,7 +401,7 @@ describe('الرسائل الصوتية', () => {
     await provider.receive({
       toNumber: '966500000001',
       from: '966555555555',
-      audio: { mimeType: 'audio/ogg', download: async () => Buffer.from('fake') },
+      media: { kind: 'audio', mimeType: 'audio/ogg', download: async () => Buffer.from('fake') },
     });
 
     expect(JSON.stringify(claude.requests[0]!.messages)).toContain('كم سعر الكشف؟');

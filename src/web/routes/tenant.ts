@@ -98,6 +98,37 @@ export function registerTenantRoutes(
     return reply.type('image/svg+xml').header('cache-control', 'no-store').send(svg);
   });
 
+  /**
+   * ملف أرسله عميل — يُقدَّم للموظف المصرَّح له وحده.
+   * المسار يُتحقق منه مقابل قاعدة البيانات لا من الطلب، فلا يستطيع أحد
+   * قراءة ملف منشأة أخرى بتخمين المسار.
+   */
+  app.get('/api/tenants/:tenantId/media/:messageId', async (request, reply) => {
+    const id = tenantOf(request);
+    const messageId = Number((request.params as Params & { messageId: string }).messageId);
+
+    const row = db
+      .prepare(
+        `SELECT m.media_path, m.media_mime, m.media_name
+         FROM messages m JOIN conversations c ON c.id = m.conversation_id
+         WHERE m.id = ? AND c.tenant_id = ?`,
+      )
+      .get(messageId, id) as { media_path: string | null; media_mime: string | null; media_name: string | null } | undefined;
+
+    if (!row?.media_path) throw Object.assign(new Error('الملف غير موجود.'), { statusCode: 404 });
+
+    const { readStored } = await import('../../media.ts');
+    const file = readStored(config.dbPath, row.media_path);
+    if (!file) throw Object.assign(new Error('الملف لم يعد موجوداً على القرص.'), { statusCode: 404 });
+
+    const { createReadStream } = await import('node:fs');
+    return reply
+      .type(row.media_mime ?? 'application/octet-stream')
+      .header('content-disposition', `inline; filename*=UTF-8''${encodeURIComponent(row.media_name ?? 'file')}`)
+      .header('cache-control', 'private, max-age=300')
+      .send(createReadStream(file.path));
+  });
+
   /* --- المحادثات --- */
   app.get('/api/tenants/:tenantId/conversations', async (request) => {
     const id = tenantOf(request);

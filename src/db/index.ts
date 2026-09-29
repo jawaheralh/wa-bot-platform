@@ -107,6 +107,10 @@ export interface MessageRow {
   user_id: number | null;
   body: string;
   media_type: string | null;
+  media_path: string | null;
+  media_name: string | null;
+  media_mime: string | null;
+  media_bytes: number | null;
   wa_message_id: string | null;
   created_at: string;
 }
@@ -184,14 +188,34 @@ export function saveMessage(
   conversationId: number,
   role: MessageRow['role'],
   body: string,
-  extra: { mediaType?: string | null; waMessageId?: string | null; userId?: number | null } = {},
+  extra: {
+    mediaType?: string | null;
+    waMessageId?: string | null;
+    userId?: number | null;
+    mediaPath?: string | null;
+    mediaName?: string | null;
+    mediaMime?: string | null;
+    mediaBytes?: number | null;
+  } = {},
 ): number {
   const info = db
     .prepare(
-      `INSERT INTO messages (conversation_id, role, body, media_type, wa_message_id, user_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO messages
+         (conversation_id, role, body, media_type, wa_message_id, user_id, media_path, media_name, media_mime, media_bytes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(conversationId, role, body, extra.mediaType ?? null, extra.waMessageId ?? null, extra.userId ?? null);
+    .run(
+      conversationId,
+      role,
+      body,
+      extra.mediaType ?? null,
+      extra.waMessageId ?? null,
+      extra.userId ?? null,
+      extra.mediaPath ?? null,
+      extra.mediaName ?? null,
+      extra.mediaMime ?? null,
+      extra.mediaBytes ?? null,
+    );
   db.prepare(`UPDATE conversations SET last_message_at = ${SQL_NOW} WHERE id = ?`).run(conversationId);
   return Number(info.lastInsertRowid);
 }

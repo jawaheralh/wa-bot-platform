@@ -162,6 +162,10 @@ export const CORE_COLUMNS: [table: string, column: string, definition: string][]
   ['conversations', 'viewing_user_id', 'INTEGER'],
   ['conversations', 'viewing_at', 'TEXT'],
   ['messages', 'user_id', 'INTEGER'],
+  ['messages', 'media_path', 'TEXT'],
+  ['messages', 'media_name', 'TEXT'],
+  ['messages', 'media_mime', 'TEXT'],
+  ['messages', 'media_bytes', 'INTEGER'],
   ['complaints', 'notified_status', 'TEXT'],
   ['tenants', 'retention_days', 'INTEGER NOT NULL DEFAULT 0'],
 ];

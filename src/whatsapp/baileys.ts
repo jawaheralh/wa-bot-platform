@@ -20,7 +20,13 @@ import baileysDefault, {
   type WAMessage,
 } from '@whiskeysockets/baileys';
 import qrcode from 'qrcode-terminal';
-import type { IncomingMessage, MessageHandler, ProviderStatus, SendResult, WhatsAppProvider } from './provider.ts';
+import type {
+  IncomingMedia,
+  MessageHandler,
+  ProviderStatus,
+  SendResult,
+  WhatsAppProvider,
+} from './provider.ts';
 import { withRetry } from './provider.ts';
 import { listTenants, normalizeNumber, type Db, type TenantRow } from '../db/index.ts';
 import type { Logger } from '../logger.ts';
@@ -294,35 +300,78 @@ export class BaileysProvider implements WhatsAppProvider {
     }
   }
 
+  /** يوحّد ما أرسله العميل — نفس شكل Cloud API تماماً. */
+  private toMedia(message: WAMessage): IncomingMedia | undefined {
+    const content = message.message;
+    if (!content) return undefined;
+
+    const download = async (): Promise<Buffer> =>
+      (await downloadMediaMessage(message, 'buffer', {})) as Buffer;
+
+    if (content.imageMessage) {
+      return {
+        kind: 'image',
+        mimeType: content.imageMessage.mimetype ?? 'image/jpeg',
+        caption: content.imageMessage.caption ?? undefined,
+        download,
+      };
+    }
+    if (content.documentMessage) {
+      return {
+        kind: 'document',
+        mimeType: content.documentMessage.mimetype ?? 'application/octet-stream',
+        filename: content.documentMessage.fileName ?? undefined,
+        caption: content.documentMessage.caption ?? undefined,
+        download,
+      };
+    }
+    if (content.audioMessage) {
+      return { kind: 'audio', mimeType: content.audioMessage.mimetype ?? 'audio/ogg', download };
+    }
+    if (content.videoMessage) {
+      return {
+        kind: 'video',
+        mimeType: content.videoMessage.mimetype ?? 'video/mp4',
+        caption: content.videoMessage.caption ?? undefined,
+        download,
+      };
+    }
+    if (content.stickerMessage) {
+      return { kind: 'sticker', mimeType: content.stickerMessage.mimetype ?? 'image/webp', download };
+    }
+    if (content.locationMessage) {
+      const l = content.locationMessage;
+      const parts = [l.name, l.address, `الإحداثيات: ${l.degreesLatitude}, ${l.degreesLongitude}`].filter(Boolean);
+      return { kind: 'location', mimeType: 'text/plain', text: parts.join(' — ') };
+    }
+    if (content.contactMessage) {
+      return {
+        kind: 'contact',
+        mimeType: 'text/plain',
+        text: content.contactMessage.displayName ?? 'جهة اتصال',
+      };
+    }
+    return undefined;
+  }
+
   private async handleRaw(tenant: TenantRow, message: WAMessage): Promise<void> {
     if (!this.handler) return;
     const jid = message.key.remoteJid ?? '';
     // المجموعات والحالات والبثّ خارج نطاق المنتج — الرد عليها يُربك العملاء.
     if (!jid.endsWith('@s.whatsapp.net')) return;
 
-    const audioMessage = message.message?.audioMessage;
     const text = extractText(message);
-    if (!text && !audioMessage) return;
+    const media = this.toMedia(message);
+    if (!text && !media) return;
 
-    const incoming: IncomingMessage = {
+    await this.handler({
       toNumber: tenant.wa_number,
       from: fromJid(jid),
       pushName: message.pushName ?? undefined,
-      text: text ?? undefined,
+      text: text ?? media?.text ?? undefined,
+      media,
       waMessageId: message.key.id ?? undefined,
       fromMe: message.key.fromMe === true,
-    };
-
-    if (audioMessage) {
-      incoming.audio = {
-        mimeType: audioMessage.mimetype ?? 'audio/ogg',
-        download: async () => {
-          const buffer = await downloadMediaMessage(message, 'buffer', {});
-          return buffer as Buffer;
-        },
-      };
-    }
-
-    await this.handler(incoming);
+    });
   }
 }

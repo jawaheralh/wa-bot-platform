@@ -6,6 +6,32 @@
  * عبر محاكي — وثلاثتها تشغّل نفس محرّك البوت بالضبط.
  */
 
+/** أنواع ما يرسله العميل غير النص. */
+export type MediaKind = 'image' | 'document' | 'audio' | 'video' | 'sticker' | 'location' | 'contact';
+
+export const MEDIA_AR: Record<MediaKind, string> = {
+  image: 'صورة',
+  document: 'ملف',
+  audio: 'رسالة صوتية',
+  video: 'مقطع فيديو',
+  sticker: 'ملصق',
+  location: 'موقع',
+  contact: 'جهة اتصال',
+};
+
+export interface IncomingMedia {
+  kind: MediaKind;
+  mimeType: string;
+  /** اسم الملف كما أرسله العميل، إن وُجد. */
+  filename?: string;
+  /** نص مصاحب للصورة أو الفيديو. */
+  caption?: string;
+  /** وصف نصي جاهز للموقع وجهة الاتصال — لا تحميل لهما. */
+  text?: string;
+  /** التحميل كسول: لا نُنزّل ما لن نستعمله. */
+  download?: () => Promise<Buffer>;
+}
+
 /** رسالة واردة بعد تطبيعها من أي مزوّد. */
 export interface IncomingMessage {
   /** الرقم المستقبِل (رقم المنشأة) — مفتاح التوجيه في Baileys والمحاكي. */
@@ -15,8 +41,8 @@ export interface IncomingMessage {
   from: string;
   pushName?: string;
   text?: string;
-  /** رسالة صوتية: نُمرّر دالة تحميل كسولة فلا نُنزّل ما لن نستعمله. */
-  audio?: { mimeType: string; download(): Promise<Buffer> };
+  /** كل ما ليس نصاً: صورة، ملف، صوت، فيديو، موقع، جهة اتصال. */
+  media?: IncomingMedia;
   waMessageId?: string;
   /** رسالة صادرة من رقم المنشأة نفسه — غالباً الموظف ردّ يدوياً من جواله. */
   fromMe?: boolean;

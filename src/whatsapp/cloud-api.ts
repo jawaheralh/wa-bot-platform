@@ -16,6 +16,8 @@ import { findTenantByPhoneNumberId, normalizeNumber, type Db } from '../db/index
 import type { Logger } from '../logger.ts';
 import type {
   IncomingMessage,
+  IncomingMedia,
+  MediaKind,
   MessageHandler,
   ProviderStatus,
   SendResult,
@@ -27,13 +29,28 @@ import { withRetry, markNoRetry } from './provider.ts';
    شكل حمولة Meta — نُصرّح ما نستعمله فقط
 --------------------------------------------------------------- */
 
+interface CloudMedia {
+  id?: string;
+  mime_type?: string;
+  caption?: string;
+  filename?: string;
+  sha256?: string;
+}
+
 interface CloudMessage {
   from?: string;
   id?: string;
   type?: string;
   text?: { body?: string };
-  audio?: { id?: string; mime_type?: string; voice?: boolean };
-  image?: { caption?: string };
+  audio?: CloudMedia & { voice?: boolean };
+  image?: CloudMedia;
+  document?: CloudMedia;
+  video?: CloudMedia;
+  sticker?: CloudMedia;
+  location?: { latitude?: number; longitude?: number; name?: string; address?: string };
+  contacts?: { name?: { formatted_name?: string }; phones?: { phone?: string }[] }[];
+  button?: { text?: string };
+  interactive?: { button_reply?: { title?: string }; list_reply?: { title?: string } };
 }
 
 interface CloudValue {
@@ -180,18 +197,21 @@ export class CloudApiProvider implements WhatsAppProvider {
             from: normalizeNumber(message.from),
             pushName,
             waMessageId: message.id,
-            text: message.text?.body ?? message.image?.caption,
+            text:
+              message.text?.body ??
+              message.button?.text ??
+              message.interactive?.button_reply?.title ??
+              message.interactive?.list_reply?.title,
           };
 
-          if (message.type === 'audio' && message.audio?.id) {
-            const mediaId = message.audio.id;
-            incoming.audio = {
-              mimeType: message.audio.mime_type ?? 'audio/ogg',
-              download: () => this.downloadMedia(mediaId),
-            };
+          const media = this.toMedia(message);
+          if (media) {
+            incoming.media = media;
+            // النص المصاحب للصورة هو طلب العميل غالباً.
+            if (!incoming.text && media.caption) incoming.text = media.caption;
           }
 
-          if (!incoming.text && !incoming.audio) continue;
+          if (!incoming.text && !incoming.media) continue;
 
           try {
             await this.handler(incoming);
@@ -203,6 +223,54 @@ export class CloudApiProvider implements WhatsAppProvider {
       }
     }
     return handled;
+  }
+
+  /**
+   * يحوّل ما أرسله العميل إلى شكل موحّد.
+   *
+   * الموقع وجهة الاتصال لا يُنزَّلان — Meta ترسل بياناتهما في الحمولة
+   * نفسها، فنُحوّلها نصاً مباشرةً.
+   */
+  private toMedia(message: CloudMessage): IncomingMedia | undefined {
+    const attach = (kind: MediaKind, data: CloudMedia | undefined, fallbackMime: string): IncomingMedia | undefined => {
+      if (!data?.id) return undefined;
+      const mediaId = data.id;
+      return {
+        kind,
+        mimeType: data.mime_type?.split(';')[0]?.trim() ?? fallbackMime,
+        filename: data.filename,
+        caption: data.caption,
+        download: () => this.downloadMedia(mediaId),
+      };
+    };
+
+    switch (message.type) {
+      case 'image':
+        return attach('image', message.image, 'image/jpeg');
+      case 'document':
+        return attach('document', message.document, 'application/octet-stream');
+      case 'audio':
+        return attach('audio', message.audio, 'audio/ogg');
+      case 'video':
+        return attach('video', message.video, 'video/mp4');
+      case 'sticker':
+        return attach('sticker', message.sticker, 'image/webp');
+      case 'location': {
+        const l = message.location;
+        if (!l) return undefined;
+        const parts = [l.name, l.address, `الإحداثيات: ${l.latitude}, ${l.longitude}`].filter(Boolean);
+        return { kind: 'location', mimeType: 'text/plain', text: parts.join(' — ') };
+      }
+      case 'contacts': {
+        const contacts = (message.contacts ?? [])
+          .map((c) => [c.name?.formatted_name, c.phones?.[0]?.phone].filter(Boolean).join(' '))
+          .filter(Boolean);
+        if (!contacts.length) return undefined;
+        return { kind: 'contact', mimeType: 'text/plain', text: contacts.join(' · ') };
+      }
+      default:
+        return undefined;
+    }
   }
 
   /** تحميل الوسائط خطوتان في Cloud API: طلب الرابط ثم تنزيله بنفس التوكن. */

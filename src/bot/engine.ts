@@ -25,6 +25,9 @@ import { buildHistory } from './history.ts';
 import { now } from '../time.ts';
 import { recordGap } from '../training.ts';
 import type { Transcriber } from '../stt/index.ts';
+import { storeMedia, isVisionImage, MAX_BYTES } from '../media.ts';
+import { MEDIA_AR } from '../whatsapp/provider.ts';
+import { readFileSync } from 'node:fs';
 
 /** أكثر من هذا يعني أن النموذج يدور في حلقة، لا أنه يحتاج خطوة إضافية. */
 const MAX_TOOL_ROUNDS = 5;
@@ -87,35 +90,70 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
       return;
     }
 
-    /* --- تحويل الصوت لنص --- */
+    /* --- ما أرسله العميل: نصاً كان أو ملفاً --- */
     let text = message.text?.trim() ?? '';
-    let mediaType: string | null = null;
+    const media = message.media;
+    let stored: Awaited<ReturnType<typeof storeMedia>>;
+    let visionImage: { mimeType: string; base64: string } | undefined;
 
-    if (!text && message.audio) {
-      mediaType = 'audio';
-      if (!transcriber) {
-        saveMessage(db, conversation.id, 'customer', '(رسالة صوتية)', {
-          mediaType,
-          waMessageId: message.waMessageId,
-        });
-        await send(tenant, conversation.id, message.from, VOICE_DISABLED_REPLY, convLogger);
-        return;
+    if (media) {
+      // الموقع وجهة الاتصال يصلان نصاً جاهزاً بلا تحميل.
+      if (media.text && !text) text = media.text;
+
+      stored = await storeMedia(config.dbPath, tenant.id, media, convLogger);
+
+      if (media.kind === 'audio' && !text) {
+        if (!transcriber) {
+          saveMessage(db, conversation.id, 'customer', '(رسالة صوتية)', {
+            mediaType: 'audio',
+            waMessageId: message.waMessageId,
+            mediaPath: stored?.relativePath,
+            mediaName: stored?.filename,
+            mediaMime: stored?.mimeType,
+            mediaBytes: stored?.bytes,
+          });
+          await send(tenant, conversation.id, message.from, VOICE_DISABLED_REPLY, convLogger);
+          return;
+        }
+        try {
+          const buffer = stored ? readFileSync(stored.path) : await media.download!();
+          text = await transcriber.transcribe(buffer, media.mimeType);
+          convLogger.info('حُوّلت رسالة صوتية لنص', { طول: text.length });
+        } catch (error) {
+          convLogger.error('فشل تحويل الرسالة الصوتية', error);
+          saveMessage(db, conversation.id, 'customer', '(رسالة صوتية تعذّر تحويلها)', {
+            mediaType: 'audio',
+            mediaPath: stored?.relativePath,
+          });
+          await send(tenant, conversation.id, message.from, VOICE_DISABLED_REPLY, convLogger);
+          return;
+        }
       }
-      try {
-        text = await transcriber.transcribe(await message.audio.download(), message.audio.mimeType);
-        convLogger.info('حُوّلت رسالة صوتية لنص', { طول: text.length });
-      } catch (error) {
-        convLogger.error('فشل تحويل الرسالة الصوتية', error);
-        saveMessage(db, conversation.id, 'customer', '(رسالة صوتية تعذّر تحويلها)', { mediaType });
-        await send(tenant, conversation.id, message.from, VOICE_DISABLED_REPLY, convLogger);
-        return;
+
+      // الصورة يراها النموذج فعلاً — صورة عطل أوضح من وصفه.
+      if (stored && isVisionImage(stored.mimeType, stored.bytes)) {
+        visionImage = { mimeType: stored.mimeType, base64: readFileSync(stored.path).toString('base64') };
       }
+    }
+
+    // ملف بلا نص: نصفه للنموذج ليعرف أن شيئاً وصل.
+    if (!text && media) {
+      text = visionImage
+        ? '(أرسل صورة)'
+        : `(أرسل ${MEDIA_AR[media.kind]}${media.filename ? `: ${media.filename}` : ''})`;
     }
 
     if (!text) return;
 
     // تُحفظ الرسالة دائماً حتى لو كان البوت صامتاً — الأدمن يحتاج السياق كاملاً.
-    saveMessage(db, conversation.id, 'customer', text, { mediaType, waMessageId: message.waMessageId });
+    saveMessage(db, conversation.id, 'customer', text, {
+      mediaType: media?.kind ?? null,
+      waMessageId: message.waMessageId,
+      mediaPath: stored?.relativePath,
+      mediaName: stored?.filename,
+      mediaMime: stored?.mimeType,
+      mediaBytes: stored?.bytes,
+    });
 
     if (!botMayReply(db, conversation.id)) {
       convLogger.debug('البوت موقوف أو صامت لهذه المحادثة — حُفظت الرسالة بلا رد');
@@ -136,9 +174,29 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
     };
 
     const enabled = enabledFor(db, tenant.id);
-    const system = [basePrompt(tenant, nowSql), composePrompt(enabled, base)].filter(Boolean).join('\n\n');
+    const attachmentNote =
+      media && !visionImage
+        ? `\n\n## ملف من العميل\nأرسل العميل ${MEDIA_AR[media.kind]}${
+            media.filename ? ` باسم «${media.filename}»` : ''
+          }. لا تستطيع فتحه، لكنه محفوظ ويراه الموظف في اللوحة.\nأقرّ باستلامه، واسأل العميل عمّا فيه إن احتجت، ولا تدّعِ أنك اطّلعت عليه.`
+        : '';
+
+    const system =
+      [basePrompt(tenant, nowSql), composePrompt(enabled, base)].filter(Boolean).join('\n\n') + attachmentNote;
     const tools = composeTools(enabled, base);
     const messages: ChatMessage[] = buildHistory(db, conversation.id, config.historyLimit);
+
+    /* --- الصورة تُمرَّر مع آخر رسالة ليراها النموذج --- */
+    if (visionImage) {
+      const last = messages[messages.length - 1];
+      const blocks = [
+        { type: 'image' as const, source: { type: 'base64' as const, media_type: visionImage.mimeType, data: visionImage.base64 } },
+        { type: 'text' as const, text: text || 'انظر للصورة وأجب عمّا فيها.' },
+      ];
+      if (last && last.role === 'user') last.content = blocks as never;
+      else messages.push({ role: 'user', content: blocks as never });
+      convLogger.info('مُرّرت صورة للنموذج', { نوع: visionImage.mimeType });
+    }
 
     convLogger.debug('تجميع السياق', {
       وحدات: enabled.map((e) => e.module.name).join(','),

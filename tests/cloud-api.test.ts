@@ -176,8 +176,9 @@ describe('تطبيع الحمولة والتوجيه', () => {
       ],
     } as never);
 
-    expect(received[0]?.audio?.mimeType).toBe('audio/ogg');
-    expect(typeof received[0]?.audio?.download).toBe('function');
+    expect(received[0]?.media?.kind).toBe('audio');
+    expect(received[0]?.media?.mimeType).toBe('audio/ogg');
+    expect(typeof received[0]?.media?.download).toBe('function');
   });
 
   it('النوع غير المدعوم (ملصق) يُتجاهل بلا خطأ', async () => {

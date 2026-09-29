@@ -4,6 +4,33 @@ import { get, post, esc, ago, guard, flash, state } from '../core.js';
 
 const ROLE_LABEL = { customer: 'العميل', bot: 'البوت', staff: 'الموظف', system: 'النظام' };
 
+const MEDIA_AR = {
+  image: 'صورة', document: 'ملف', audio: 'رسالة صوتية',
+  video: 'فيديو', sticker: 'ملصق', location: 'موقع', contact: 'جهة اتصال',
+};
+
+/** يعرض المرفق: الصورة تُعرض، والصوت والفيديو يُشغَّلان، والبقية رابط تنزيل. */
+function attachment(m) {
+  if (!m.media_path) return '';
+  const url = `/api/tenants/${state.tenantId}/media/${m.id}`;
+  const mime = m.media_mime || '';
+  const size = m.media_bytes ? ` · ${Math.round(m.media_bytes / 1024)} ك.ب` : '';
+
+  if (mime.startsWith('image/')) {
+    return `<a href="${url}" target="_blank" rel="noopener">
+      <img src="${url}" alt="${esc(MEDIA_AR[m.media_type] || 'مرفق')}"
+           style="max-width:220px;border-radius:8px;display:block;margin:6px 0"></a>`;
+  }
+  if (mime.startsWith('audio/')) {
+    return `<audio controls src="${url}" style="display:block;margin:6px 0;max-width:240px"></audio>`;
+  }
+  if (mime.startsWith('video/')) {
+    return `<video controls src="${url}" style="max-width:240px;border-radius:8px;display:block;margin:6px 0"></video>`;
+  }
+  return `<a class="btn ghost small" href="${url}" target="_blank" rel="noopener" style="margin:6px 0">
+    ⬇ ${esc(m.media_name || MEDIA_AR[m.media_type] || 'ملف')}${size}</a>`;
+}
+
 export async function renderConversations(main) {
   const [list, { staff }] = await Promise.all([
     get(`/api/tenants/${state.tenantId}/conversations`),
@@ -112,7 +139,7 @@ async function openThread(conversationId, main, staff) {
         messages.length
           ? messages
               .map(
-                (m) => `<div class="bubble ${esc(m.role)}">${esc(m.body)}
+                (m) => `<div class="bubble ${esc(m.role)}">${attachment(m)}${esc(m.body)}
                   <span class="meta">${esc(
                     m.role === 'staff' && m.author_name ? m.author_name : ROLE_LABEL[m.role] || m.role,
                   )} · ${esc(m.created_at.slice(5, 16))}</span>
