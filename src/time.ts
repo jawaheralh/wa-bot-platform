@@ -42,6 +42,16 @@ export function now(date: Date = new Date()): string {
   return `${p.year}-${p.month}-${p.day} ${hour}:${p.minute}:${p.second}`;
 }
 
+/**
+ * ختم واتساب (ثوانٍ الحقبة) ← نص بتوقيت الرياض بنفس صيغة SQL_NOW.
+ *
+ * يمرّ على now() نفسها فلا تتفرّع صيغتان للوقت في النظام — وتفرّعها
+ * هو ما يُنتج ترتيباً مختلاً في اللوحة بلا أن يظهر خطأ.
+ */
+export function fromEpochSeconds(seconds: number): string {
+  return now(new Date(seconds * 1000));
+}
+
 /** تاريخ اليوم بتوقيت الرياض: YYYY-MM-DD. */
 export function today(offsetDays = 0, date: Date = new Date()): string {
   const shifted = new Date(date.getTime() + offsetDays * 86_400_000);

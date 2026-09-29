@@ -16,13 +16,14 @@ import {
   getOrCreateConversation,
   saveMessage,
   botMayReply,
+  latestCustomerMessageAt,
   silenceConversation,
   type TenantRow,
 } from '../db/index.ts';
 import { composePrompt, composeContext, composeTools, dispatchTool, enabledFor } from '../modules/registry.ts';
 import { basePrompt, volatilePrompt, FALLBACK_REPLY, VOICE_DISABLED_REPLY } from './prompt.ts';
 import { buildHistory } from './history.ts';
-import { now } from '../time.ts';
+import { now, fromEpochSeconds } from '../time.ts';
 import { recordGap } from '../training.ts';
 import { claudeFor, recordUsage, recordCache } from '../tenant-claude.ts';
 import type { Transcriber } from '../stt/index.ts';
@@ -148,15 +149,46 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
 
     if (!text) return;
 
+    /**
+     * الرسالة المتأخرة: تُحفظ دائماً، ويُقرَّر الرد بعد حفظها.
+     *
+     * القرار يحتاج آخر رسالة سابقة، فيُقرأ قبل الحفظ لئلا تصير
+     * الرسالة نفسها هي «الأحدث».
+     */
+    const newest = latestCustomerMessageAt(db, conversation.id);
+
     // تُحفظ الرسالة دائماً حتى لو كان البوت صامتاً — الأدمن يحتاج السياق كاملاً.
     saveMessage(db, conversation.id, 'customer', text, {
       mediaType: media?.kind ?? null,
       waMessageId: message.waMessageId,
+      sentAt: message.sentAt,
       mediaPath: stored?.relativePath,
       mediaName: stored?.filename,
       mediaMime: stored?.mimeType,
       mediaBytes: stored?.bytes,
     });
+
+    /**
+     * رسالة قديمة تجاوزها الحديث: تُحفظ ولا يُردّ عليها.
+     *
+     * حدث فعلاً: رسالة كُتبت ٣:٤٦ سلّمتها Meta ٥:١١، فردّ عليها البوت
+     * بعد ساعة ونصف وقد أُغلقت شكواها وانتهى موضوعها — فبدا وكأنه
+     * يفتح الموضوع من جديد بلا سبب.
+     *
+     * ولا تُهمَل: الحفظ يبقى، فلا تضيع رسالة عميل أبداً. وإن كانت
+     * الأحدث — كأن يكون الخادم قد هبط ثم عاد — رُدّ عليها، فالعميل
+     * ينتظر ولا شيء تجاوزها.
+     */
+    if (message.sentAt && newest) {
+      const sent = fromEpochSeconds(message.sentAt);
+      if (sent < newest) {
+        convLogger.warn('رسالة متأخرة التسليم تجاوزها الحديث — حُفظت بلا رد', {
+          أُرسلت: sent,
+          آخر_رسالة: newest,
+        });
+        return;
+      }
+    }
 
     if (!botMayReply(db, conversation.id)) {
       convLogger.debug('البوت موقوف أو صامت لهذه المحادثة — حُفظت الرسالة بلا رد');

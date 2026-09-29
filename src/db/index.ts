@@ -10,7 +10,7 @@ import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { CORE_TABLES, CORE_COLUMNS } from './schema.ts';
-import { SQL_NOW, today } from '../time.ts';
+import { SQL_NOW, today, fromEpochSeconds } from '../time.ts';
 
 export type Db = Database.Database;
 
@@ -209,13 +209,21 @@ export function saveMessage(
     mediaName?: string | null;
     mediaMime?: string | null;
     mediaBytes?: number | null;
+    /**
+     * لحظة إرسال العميل بثوانٍ الحقبة. بدونها يُسجَّل وقت الوصول.
+     *
+     * الفرق يظهر حين يتأخر التسليم: رسالة كُتبت ٣:٤٦ ووصلت ٥:١١
+     * تُعرض في اللوحة ٥:١١ بينما تُعرض في واتساب ٣:٤٦، فيقرأ الموظف
+     * ترتيباً لا يطابق ما يراه العميل.
+     */
+    sentAt?: number | null;
   } = {},
 ): number {
   const info = db
     .prepare(
       `INSERT INTO messages
-         (conversation_id, role, body, media_type, wa_message_id, user_id, media_path, media_name, media_mime, media_bytes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (conversation_id, role, body, media_type, wa_message_id, user_id, media_path, media_name, media_mime, media_bytes, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, ${SQL_NOW}))`,
     )
     .run(
       conversationId,
@@ -228,9 +236,28 @@ export function saveMessage(
       extra.mediaName ?? null,
       extra.mediaMime ?? null,
       extra.mediaBytes ?? null,
+      // ثوانٍ الحقبة ← نص بتوقيت الرياض، بنفس صيغة SQL_NOW.
+      extra.sentAt ? fromEpochSeconds(extra.sentAt) : null,
     );
   db.prepare(`UPDATE conversations SET last_message_at = ${SQL_NOW} WHERE id = ?`).run(conversationId);
   return Number(info.lastInsertRowid);
+}
+
+/**
+ * ختم آخر رسالة من العميل في هذه المحادثة.
+ *
+ * يُستعمل لتمييز الرسالة المتأخرة التسليم: إن كان ختم الواردة أقدم
+ * من هذا، فقد تجاوزها الحديث ولا معنى للرد عليها.
+ */
+export function latestCustomerMessageAt(db: Db, conversationId: number): string | undefined {
+  const row = db
+    .prepare(
+      `SELECT created_at FROM messages
+        WHERE conversation_id = ? AND role = 'customer'
+        ORDER BY created_at DESC LIMIT 1`,
+    )
+    .get(conversationId) as { created_at: string } | undefined;
+  return row?.created_at;
 }
 
 /** آخر N رسالة بالترتيب الزمني الصاعد — جاهزة للنموذج. */

@@ -42,6 +42,8 @@ interface CloudMessage {
   from?: string;
   id?: string;
   type?: string;
+  /** ثوانٍ منذ الحقبة، نصاً — لحظة إرسال العميل لا لحظة وصول الـwebhook. */
+  timestamp?: string;
   text?: { body?: string };
   audio?: CloudMedia & { voice?: boolean };
   image?: CloudMedia;
@@ -213,6 +215,8 @@ export class CloudApiProvider implements WhatsAppProvider {
             from: normalizeNumber(message.from),
             pushName,
             waMessageId: message.id,
+            // ختم Meta بالثواني — وقت الإرسال لا وقت التسليم.
+            sentAt: message.timestamp ? Number(message.timestamp) : undefined,
             text:
               message.text?.body ??
               message.button?.text ??
