@@ -157,7 +157,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .chat { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; padding: 6px; }
 .bubble { max-width: 74%; padding: 8px 12px; border-radius: 14px; white-space: pre-wrap; word-break: break-word; }
 .bubble .meta { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; direction: ltr; text-align: left; }
-.bubble.customer { align-self: flex-start; background: #f3edea; border-start-start-radius: 4px; }
+.bubble.customer { align-self: flex-start; background: #fff; border: 1px solid var(--line); border-start-start-radius: 4px; }
 .bubble.bot { align-self: flex-end; background: var(--deep); color: #fff; border-start-end-radius: 4px; }
 /* الموظف بلون ثالث: التمييز بين رد البوت ورد الإنسان أهم من الجمال */
 .bubble.bot .meta { color: rgba(255, 255, 255, 0.7); }

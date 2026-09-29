@@ -26,8 +26,12 @@
       background: var(--deep);
     }
 
+    /* العرض على الغلاف لا على البطاقة: البطاقة داخل شبكة مركزية،
+       و100% عليها يعود على غلاف بلا عرض محدّد فينزاح المحور. */
+    .shell { width: min(400px, 100%); }
+
     .box {
-      width: min(400px, 100%);
+      width: 100%;
       background: #fff;
       border: 0;
       border-radius: 24px;
@@ -37,6 +41,9 @@
     }
 
     .home { display: inline-block; color: #fff; text-decoration: none; opacity: .8; font-size: 15px; margin-bottom: 14px }
+    /* السهم كصندوق مستقل لا كحرف: الحرف المحايد في سطر عربي يقفز
+       إلى الطرف الآخر حسب ما حوله، فيشير إلى عكس الوجهة. */
+    .home::before { content: '→'; display: inline-block; margin-inline-end: 6px }
     .home:hover { opacity: 1 }
 
     .kicker { font-family: 'Amiri', serif; font-style: italic; font-size: 24px; color: var(--accent); margin: 0 }
@@ -66,8 +73,8 @@
   </style>
 </head>
 <body>
-  <div>
-    <a class="home" href="/">→ الصفحة الرئيسية</a>
+  <div class="shell">
+    <a class="home" href="/">الصفحة الرئيسية</a>
 
     <form class="card box" id="form">
       <p class="kicker">أهلاً بك</p>
