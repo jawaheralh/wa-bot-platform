@@ -57,6 +57,9 @@ export const CORE_TABLES: string[] = [
     bot_enabled     INTEGER NOT NULL DEFAULT 1,          -- إيقاف يدوي من صفحة الأدمن
     silent_until    TEXT,                                -- صمت مؤقت بعد تدخّل الموظف
     handoff_reason  TEXT,
+    contact_phone   TEXT,                                -- رقم تواصل بديل يذكره العميل
+    customer_city   TEXT,                                -- مدينته أو المحطة التي يقصدها
+    intake_done     INTEGER NOT NULL DEFAULT 0,          -- اكتملت بيانات الاستقبال
     assigned_to     INTEGER REFERENCES users(id) ON DELETE SET NULL,
     assigned_at     TEXT,
     viewing_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -151,6 +154,9 @@ export const CORE_TABLES: string[] = [
 export const CORE_COLUMNS: [table: string, column: string, definition: string][] = [
   ['users', 'wa_number', 'TEXT'],
   ['users', 'active', 'INTEGER NOT NULL DEFAULT 1'],
+  ['conversations', 'contact_phone', 'TEXT'],
+  ['conversations', 'customer_city', 'TEXT'],
+  ['conversations', 'intake_done', 'INTEGER NOT NULL DEFAULT 0'],
   ['conversations', 'assigned_to', 'INTEGER'],
   ['conversations', 'assigned_at', 'TEXT'],
   ['conversations', 'viewing_user_id', 'INTEGER'],

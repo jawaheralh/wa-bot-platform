@@ -44,6 +44,15 @@ function fieldFor(moduleName, key, value) {
 
 /** أسماء عربية للمفاتيح المعروفة؛ المفتاح الجديد يظهر باسمه حتى يُضاف هنا. */
 const LABELS = {
+  greeting: 'نص الترحيب',
+  askName: 'اسأل عن الاسم',
+  askAltPhone: 'اسأل عن رقم تواصل بديل',
+  askLocation: 'اسأل عن الموقع',
+  locations: 'المواقع المتاحة',
+  menu: 'قائمة الخدمات المعروضة',
+  requireBeforeService: 'امنع الخدمة قبل اكتمال البيانات',
+  notifyCustomer: 'إبلاغ العميل بكل تغيير حالة',
+  kinds: 'أنواع الطلبات',
   freeText: 'النص الحر',
   unknownPolicy: 'ما يُقال عند عدم المعرفة',
   escalateFrom: 'تصعيد الشكوى من خطورة',

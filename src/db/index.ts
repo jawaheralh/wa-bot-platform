@@ -89,6 +89,9 @@ export interface ConversationRow {
   bot_enabled: number;
   silent_until: string | null;
   handoff_reason: string | null;
+  contact_phone: string | null;
+  customer_city: string | null;
+  intake_done: number;
   assigned_to: number | null;
   assigned_at: string | null;
   viewing_user_id: number | null;

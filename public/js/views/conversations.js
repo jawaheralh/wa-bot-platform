@@ -24,7 +24,9 @@ export async function renderConversations(main) {
               <tbody>${list
                 .map(
                   (c) => `<tr>
-                    <td>${esc(c.customer_name || '—')}<br><span class="num muted">${esc(c.customer_wa)}</span></td>
+                    <td>${esc(c.customer_name || '—')}
+                      ${c.customer_city ? `<span class="badge grey">${esc(c.customer_city)}</span>` : ''}
+                      <br><span class="num muted">${esc(c.customer_wa)}</span></td>
                     <td class="muted">${esc((c.last_body || '').slice(0, 70))}</td>
                     <td class="muted">${esc(ago(c.last_message_at))}</td>
                     <td>${
@@ -68,7 +70,10 @@ async function openThread(conversationId, main, staff) {
   thread.innerHTML = `
     <div class="card">
       <h3>${esc(conversation.customer_name || conversation.customer_wa)}
-        <span class="num muted" style="font-weight:400">${esc(conversation.customer_wa)}</span></h3>
+        <span class="num muted" style="font-weight:400">${esc(conversation.customer_wa)}</span>
+        ${conversation.customer_city ? `<span class="badge grey">${esc(conversation.customer_city)}</span>` : ''}
+        ${conversation.contact_phone ? `<span class="badge grey num">${esc(conversation.contact_phone)}</span>` : ''}
+      </h3>
       ${conversation.handoff_reason ? `<p class="muted">سبب آخر تحويل: ${esc(conversation.handoff_reason)}</p>` : ''}
 
       ${

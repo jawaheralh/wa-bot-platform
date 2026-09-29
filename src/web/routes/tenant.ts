@@ -106,6 +106,7 @@ export function registerTenantRoutes(
         `SELECT c.*,
                 CASE WHEN c.silent_until IS NOT NULL AND c.silent_until > ${SQL_NOW} THEN 1 ELSE 0 END AS silent,
                 a.display_name AS assigned_name,
+                c.customer_city, c.contact_phone,
                 (SELECT body FROM messages WHERE conversation_id = c.id ORDER BY id DESC LIMIT 1) AS last_body,
                 (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id) AS message_count
          FROM conversations c
