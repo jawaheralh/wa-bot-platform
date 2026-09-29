@@ -312,6 +312,9 @@ label.inline input { width: auto; }
   background-position: 0 0, 8px 8px;
 }
 .logo-box img { max-width: 180px; max-height: 90px; object-fit: contain; }
+/* صورة واتساب مربّعة لا ممتدة — كما تظهر عند العميل تماماً */
+.wa-photo { min-height: 150px; }
+.wa-photo img { width: 120px; height: 120px; max-width: none; max-height: none; border-radius: 50%; object-fit: cover; }
 .logo-box { position: relative; cursor: pointer; transition: border-color .12s ease; }
 .logo-box:hover { border-color: var(--accent); }
 

@@ -37,6 +37,8 @@ import type { AppConfig } from '../../config.ts';
 import type { WhatsAppProvider } from '../../whatsapp/provider.ts';
 import { SQL_NOW } from '../../time.ts';
 import { readBranding, saveColors, storeLogo, removeLogo, readLogo, paletteFor } from '../../branding.ts';
+import { readProfile, updateProfile, setPhoto, VERTICALS } from '../../wa-profile.ts';
+import { credentialsFor } from '../../tenant-meta.ts';
 
 interface Params {
   tenantId: string;
@@ -753,6 +755,98 @@ export function registerTenantRoutes(
       // الشعار يتغيّر نادراً، لكنه إن تغيّر وجب أن يُرى فوراً.
       .header('cache-control', 'private, max-age=60')
       .send(file.body);
+  });
+
+  /* ---------------------------------------------------------------
+     ملفّ واتساب: صورة الرقم ونبذته
+  --------------------------------------------------------------- */
+
+  /**
+   * هذا ملفّ عام يراه كل من يفتح المحادثة، لا إعداد داخلي.
+   *
+   * ولذلك هو للمالك وحده حتى في القراءة: بيانات الاتصال والعنوان
+   * والبريد ليست مما يراه كل موظف، ولا يحتاجها ليرد على عميل.
+   */
+  app.get('/api/tenants/:tenantId/wa-profile', async (request) => {
+    const id = adminOf(request);
+    const tenant = getTenant(db, id);
+    if (!tenant) throw Object.assign(new Error('المنشأة غير موجودة.'), { statusCode: 404 });
+
+    const result = await readProfile(
+      config,
+      credentialsFor(config, tenant),
+      tenant.wa_phone_number_id ?? '',
+    );
+    return { ...result, verticals: VERTICALS };
+  });
+
+  app.put('/api/tenants/:tenantId/wa-profile', async (request) => {
+    const id = adminOf(request);
+    const tenant = getTenant(db, id);
+    if (!tenant) throw Object.assign(new Error('المنشأة غير موجودة.'), { statusCode: 404 });
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const result = await updateProfile(config, credentialsFor(config, tenant), tenant.wa_phone_number_id ?? '', {
+      about: body.about === undefined ? undefined : String(body.about),
+      description: body.description === undefined ? undefined : String(body.description),
+      address: body.address === undefined ? undefined : String(body.address),
+      email: body.email === undefined ? undefined : String(body.email),
+      vertical: body.vertical === undefined ? undefined : String(body.vertical),
+      websites: Array.isArray(body.websites) ? body.websites.map(String).filter(Boolean) : undefined,
+    });
+
+    if (!result.ok) throw Object.assign(new Error(result.message), { statusCode: 400 });
+
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username ?? '',
+      action: 'wa_profile_change',
+      ip: request.ip,
+    });
+    return result;
+  });
+
+  /**
+   * تغيير الصورة فعلٌ ظاهر للعملاء فور تنفيذه.
+   *
+   * لا يُنفَّذ إلا بطلب صريح من المالك، ويُسجَّل في سجل التدقيق باسمه —
+   * فمن غيّر وجه الرقم أمام كل عملائه معروف.
+   */
+  app.post('/api/tenants/:tenantId/wa-profile/photo', async (request) => {
+    const id = adminOf(request);
+    const tenant = getTenant(db, id);
+    if (!tenant) throw Object.assign(new Error('المنشأة غير موجودة.'), { statusCode: 404 });
+
+    const body = (request.body ?? {}) as { file?: string; useLogo?: boolean };
+
+    /**
+     * «استعمل الشعار» يقرأ الملف من القرص لا من المتصفح.
+     *
+     * الشعار مرفوع عندنا أصلاً، فإعادته إلى المتصفح ليعيده إلينا رحلةٌ
+     * بلا فائدة — وتفشل حين يكون كبيراً أو بطيء الشبكة.
+     */
+    let image: Buffer;
+    if (body.useLogo) {
+      const { logo } = readBranding(db, id);
+      const file = logo ? readLogo(config.dbPath, logo) : undefined;
+      if (!file) throw Object.assign(new Error('لا شعار مرفوع لهذه المنشأة.'), { statusCode: 400 });
+      image = file.body;
+    } else {
+      if (!body.file) throw Object.assign(new Error('لم تصل أي صورة.'), { statusCode: 400 });
+      image = Buffer.from(String(body.file).replace(/^data:[^,]*,/, ''), 'base64');
+    }
+    const result = await setPhoto(config, credentialsFor(config, tenant), tenant.wa_phone_number_id ?? '', image);
+    if (!result.ok) throw Object.assign(new Error(result.message), { statusCode: 400 });
+
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username ?? '',
+      action: 'wa_profile_photo',
+      ip: request.ip,
+    });
+    return result;
   });
 
   /* ---------------------------------------------------------------

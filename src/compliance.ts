@@ -52,6 +52,8 @@ export const ACTION_AR: Record<string, string> = {
   kb_change: 'تعديل قاعدة المعرفة',
   module_config: 'تعديل إعدادات وحدة',
   branding_change: 'تعديل هوية المنشأة',
+  wa_profile_change: 'تعديل ملف واتساب',
+  wa_profile_photo: 'تغيير صورة رقم واتساب',
   staff_change: 'تعديل موظف',
   password_changed: 'تغيير كلمة المرور',
   totp_enabled: 'تفعيل التحقق بخطوتين',

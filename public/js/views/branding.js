@@ -107,6 +107,15 @@ export async function renderBranding(main) {
       </div>
     </div>
 
+    <div class="card" id="waCard">
+      <h3>ملف واتساب للأعمال</h3>
+      <p class="muted" style="margin-top:0">
+        هذا ما يراه عميلك قبل أن يكتب حرفاً: صورة الرقم ونبذته.
+        يُقرأ من Meta ويُكتب إليها مباشرة.
+      </p>
+      <div id="waBody"><div class="empty">جارٍ القراءة من Meta…</div></div>
+    </div>
+
     <div class="card">
       <h3>المعاينة</h3>
       <p class="muted" style="margin-top:0">ما يراه موظفو المنشأة. يتغيّر مع كل اختيار قبل الحفظ.</p>
@@ -265,6 +274,9 @@ export async function renderBranding(main) {
 
   if (branding.logoUrl) void suggestFromLogo(branding.logoUrl, main, color, preview);
 
+  // ملف واتساب يُقرأ من Meta، وقد يبطئ أو يُرفض — فلا يُؤخّر رسم الشاشة.
+  void renderWaProfile(main, Boolean(branding.logoUrl));
+
   const drop = main.querySelector('#dropLogo');
   if (drop) {
     drop.onclick = guard(async () => {
@@ -274,6 +286,140 @@ export async function renderBranding(main) {
       await renderBranding(main);
     });
   }
+}
+
+/* ---------------------------------------------------------------
+   ملفّ واتساب
+--------------------------------------------------------------- */
+
+async function renderWaProfile(main, hasLogo) {
+  const box = main.querySelector('#waBody');
+  let result;
+  try {
+    result = await get(`/api/tenants/${state.tenantId}/wa-profile`);
+  } catch (error) {
+    box.innerHTML = `<div class="error">${esc(error.message)}</div>`;
+    return;
+  }
+
+  if (!result.ok) {
+    box.innerHTML = `<div class="warn-box">${esc(result.message)}</div>`;
+    return;
+  }
+
+  const p = result.data;
+  box.innerHTML = `
+    <div class="row" style="align-items:flex-start">
+      <div style="flex:0 0 auto;max-width:190px">
+        <label>صورة الرقم</label>
+        <div class="logo-box wa-photo" id="waPhoto" tabindex="0" role="button" aria-label="تغيير صورة الرقم">
+          ${
+            p.profilePictureUrl
+              ? `<img src="${esc(p.profilePictureUrl)}" alt="صورة رقم واتساب">`
+              : '<span class="muted">اسحب صورة هنا أو اضغط</span>'
+          }
+          <span class="drop-hint">أفلِت الصورة هنا</span>
+        </div>
+        <input id="waPhotoFile" type="file" accept="image/png,image/jpeg" hidden>
+        ${
+          hasLogo
+            ? '<div class="actions"><button class="btn ghost small" id="useLogo">استعمال شعار المنشأة</button></div>'
+            : ''
+        }
+        <p class="muted" style="margin:6px 0 0">
+          مربّعة، PNG أو JPG، ٦٤٠×٦٤٠ فأكثر.
+          والشفافية قد تظهر سوداء عند العميل — الأفضل خلفية مصمتة.
+        </p>
+      </div>
+
+      <div style="min-width:260px">
+        <label for="waAbout">النبذة (تظهر تحت الاسم)</label>
+        <input id="waAbout" maxlength="139" value="${esc(p.about)}">
+        <label for="waDesc">الوصف</label>
+        <textarea id="waDesc" maxlength="512" style="min-height:70px">${esc(p.description)}</textarea>
+      </div>
+
+      <div style="min-width:240px">
+        <label for="waEmail">البريد الإلكتروني</label>
+        <input id="waEmail" dir="ltr" value="${esc(p.email)}">
+        <label for="waSite">الموقع</label>
+        <input id="waSite" dir="ltr" placeholder="https://" value="${esc(p.websites[0] ?? '')}">
+        <label for="waVertical">مجال النشاط</label>
+        <select id="waVertical">
+          ${Object.entries(result.verticals)
+            .map(([key, label]) => `<option value="${key}"${key === p.vertical ? ' selected' : ''}>${esc(label)}</option>`)
+            .join('')}
+        </select>
+      </div>
+    </div>
+
+    <label for="waAddress">العنوان</label>
+    <input id="waAddress" value="${esc(p.address)}">
+
+    <div class="actions"><button class="btn" id="waSave">حفظ على واتساب</button></div>
+  `;
+
+  box.querySelector('#waSave').onclick = guard(async () => {
+    const site = box.querySelector('#waSite').value.trim();
+    await put(`/api/tenants/${state.tenantId}/wa-profile`, {
+      about: box.querySelector('#waAbout').value.trim(),
+      description: box.querySelector('#waDesc').value.trim(),
+      email: box.querySelector('#waEmail').value.trim(),
+      address: box.querySelector('#waAddress').value.trim(),
+      vertical: box.querySelector('#waVertical').value,
+      websites: site ? [site] : [],
+    });
+    flash('حُدّث ملف واتساب.');
+  });
+
+  /* --- الصورة --- */
+
+  const photoBox = box.querySelector('#waPhoto');
+  const photoFile = box.querySelector('#waPhotoFile');
+
+  async function sendPhoto(payload) {
+    const result = await post(`/api/tenants/${state.tenantId}/wa-profile/photo`, payload);
+    flash(result.message);
+    await renderWaProfile(main, hasLogo);
+  }
+
+  photoBox.onclick = () => photoFile.click();
+  photoBox.onkeydown = (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      photoFile.click();
+    }
+  };
+  photoFile.onchange = guard(async () => {
+    const chosen = photoFile.files?.[0];
+    if (!chosen) return;
+    await sendPhoto({ file: await readAsDataUrl(chosen) });
+  });
+
+  let depth = 0;
+  photoBox.addEventListener('dragenter', (event) => {
+    event.preventDefault();
+    depth += 1;
+    photoBox.classList.add('over');
+  });
+  photoBox.addEventListener('dragover', (event) => event.preventDefault());
+  photoBox.addEventListener('dragleave', () => {
+    depth = Math.max(0, depth - 1);
+    if (depth === 0) photoBox.classList.remove('over');
+  });
+  photoBox.addEventListener(
+    'drop',
+    guard(async (event) => {
+      event.preventDefault();
+      depth = 0;
+      photoBox.classList.remove('over');
+      const chosen = event.dataTransfer?.files?.[0];
+      if (chosen) await sendPhoto({ file: await readAsDataUrl(chosen) });
+    }),
+  );
+
+  const useLogo = box.querySelector('#useLogo');
+  if (useLogo) useLogo.onclick = guard(() => sendPhoto({ useLogo: true }));
 }
 
 function readAsDataUrl(blob) {
