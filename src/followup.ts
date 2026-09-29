@@ -29,7 +29,7 @@ const BEFORE_MINUTES = 120;
 const WINDOW_HOURS = 24;
 
 /** نص احتياطي حين يتعذّر النموذج — المتابعة أهم من بلاغتها. */
-const FALLBACK = 'نتابع معك بخصوص طلبك. هل تحتاج أي مساعدة؟';
+const FALLBACK = 'نتابع معك بخصوص طلبك. فيه شي ثاني نقدر نساعد فيه؟';
 
 export interface Candidate {
   conversationId: number;

@@ -280,7 +280,7 @@ export function registerTenantRoutes(
     // الغلاف يحجب الإرسال على أي حال، لكن السكوت هنا يوهم الموظف أن رده وصل.
     if (config.readOnly) {
       throw Object.assign(
-        new Error('وضع «عرض فقط» مُفعَّل — لا يُرسل النظام أي رسالة. أزيلي READ_ONLY من .env للرد.'),
+        new Error('وضع «عرض فقط» مُفعَّل — لا يُرسل النظام أي رسالة. تُحذف READ_ONLY من .env للرد.'),
         { statusCode: 409 },
       );
     }
@@ -707,7 +707,7 @@ export function registerTenantRoutes(
 
     const variables = Array.isArray(body.variables) ? body.variables.map((v) => String(v ?? '').trim()) : [];
     if (variables.some((v) => !v)) {
-      throw Object.assign(new Error('املئي كل متغيّرات القالب.'), { statusCode: 400 });
+      throw Object.assign(new Error('متغيّرات القالب غير مكتملة.'), { statusCode: 400 });
     }
 
     const sent = await provider.sendTemplate(id, to, {

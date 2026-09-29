@@ -20,8 +20,8 @@ if [[ -z "$SSH_TARGET" || -z "$DOMAIN" ]]; then
 
 مثال:  bash deploy/migrate.sh ubuntu@129.159.20.11 bot.4uwaqodi.sa
 
-قبل التشغيل تأكدي من:
-  ١. الخادم يعمل وتستطيعين الدخول إليه:  ssh ubuntu@عنوانه
+قبل التشغيل يلزم التأكد من:
+  ١. الخادم يعمل والدخول إليه ممكن:  ssh ubuntu@عنوانه
   ٢. النطاق يشير لعنوان الخادم (سجل A)
 USAGE
   exit 1
@@ -35,7 +35,7 @@ SERVER_IP=$(ssh "$SSH_TARGET" 'curl -s --max-time 10 ifconfig.me || true')
 DOMAIN_IP=$(dig +short "$DOMAIN" A | tail -1)
 if [[ -n "$SERVER_IP" && "$SERVER_IP" != "$DOMAIN_IP" ]]; then
   echo "  ⚠️  $DOMAIN يشير إلى ${DOMAIN_IP:-(لا شيء)} والخادم $SERVER_IP" >&2
-  echo "     صحّحي سجل A ثم أعيدي المحاولة — بدونه لن تُصدَر شهادة HTTPS." >&2
+  echo "     يُصحَّح سجل A ثم تُعاد المحاولة — بدونه لن تُصدَر شهادة HTTPS." >&2
   read -rp "  أتابع رغم ذلك؟ (y/N) " go
   [[ "$go" == "y" ]] || exit 1
 else

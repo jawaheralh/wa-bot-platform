@@ -196,7 +196,7 @@ async function openThread(conversationId, main, staff) {
   document.getElementById('send').onclick = guard(async () => {
     const text = document.getElementById('reply').value.trim();
     if (!text) return;
-    if (assignedToOther && !confirm(`هذه المحادثة مُسندة إلى ${assigneeName}. ترسلين على أي حال؟`)) return;
+    if (assignedToOther && !confirm(`هذه المحادثة مُسندة إلى ${assigneeName}. الإرسال على أي حال؟`)) return;
     await post(`/api/tenants/${state.tenantId}/conversations/${conversationId}/reply`, { text });
     flash('أُرسل الرد، والبوت صامت لساعتين.');
     await openThread(conversationId, main, staff);

@@ -15,7 +15,7 @@ const HINTS = {
   WA_APP_SECRET: 'developers.facebook.com ← إعدادات التطبيق ← أساسي ← إظهار',
   WA_APP_ID: 'يظهر في نفس صفحة المفتاح السري، أو في رابط صفحة التطبيق',
   WA_BUSINESS_ID: 'business.facebook.com ← معلومات النشاط التجاري',
-  WA_VERIFY_TOKEN: 'يُولَّد تلقائياً. لا تحتاجين نسخه — زر الضبط يرسله لـMeta وحده.',
+  WA_VERIFY_TOKEN: 'يُولَّد تلقائياً. لا حاجة لنسخه — زر الضبط يرسله لـMeta وحده.',
   ANTHROPIC_API_KEY: 'console.anthropic.com ← API Keys. بدونه لن يرد البوت.',
   OPENAI_API_KEY: 'اختياري — لتحويل الرسائل الصوتية لنص.',
   SUPPORT_WHATSAPP: 'يظهر لعملائك عند الوحدات المعطّلة.',

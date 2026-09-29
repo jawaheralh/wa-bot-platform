@@ -28,7 +28,7 @@ export interface BlockedMessage {
 export class ReadOnlyProvider implements WhatsAppProvider {
   private readonly inner: WhatsAppProvider;
   private readonly logger: Logger;
-  /** ما كان سيُرسل — يظهر في اللوحة فتعرفين ماذا كان البوت سيقول. */
+  /** ما كان سيُرسل — يظهر في اللوحة فيُعرف ماذا كان البوت سيقول. */
   readonly blocked: BlockedMessage[] = [];
   private counter = 0;
 

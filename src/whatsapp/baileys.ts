@@ -122,7 +122,7 @@ export class BaileysProvider implements WhatsAppProvider {
     if (!tenant.wa_phone_number_id) return false;
     this.logger.error(
       `رُفض فتح جلسة QR للمنشأة «${tenant.name}» (${tenant.wa_number}): الرقم مسجَّل في Meta Cloud API. ` +
-        'مسحه بـBaileys قد يعرّض الرقم للإيقاف — استعملي WA_PROVIDER=cloud لهذه المنشأة.',
+        'مسحه بـBaileys قد يعرّض الرقم للإيقاف — الأنسب WA_PROVIDER=cloud لهذه المنشأة.',
       undefined,
       { tenant: tenant.id },
     );

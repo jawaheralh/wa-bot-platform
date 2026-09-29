@@ -59,7 +59,7 @@ async function main(): Promise<void> {
     console.log(dim(`  ملاحظة: WA_PROVIDER = ${config.provider}. للإنتاج اجعليه cloud.`));
   }
   if (missing.length) {
-    console.log(red('\n  أكملي الناقص أولاً:  npm run setup\n'));
+    console.log(red('\n  الناقص يُكمَّل أولاً:  npm run setup\n'));
     process.exit(1);
   }
 

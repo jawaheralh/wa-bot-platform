@@ -16,7 +16,7 @@ if [[ -z "$DOMAIN" ]]; then
   exit 1
 fi
 
-if [[ $EUID -ne 0 ]]; then echo "شغّليه بـsudo" >&2; exit 1; fi
+if [[ $EUID -ne 0 ]]; then echo "يلزم تشغيله بـsudo" >&2; exit 1; fi
 
 echo "▸ تحصين الخادم"
 
@@ -103,7 +103,7 @@ elif [[ ! -f "$APP_DIR/.env" ]]; then
   SECRET=$(openssl rand -hex 32)
   sudo -u wabot sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$SECRET|" .env
   sudo -u wabot sed -i "s|^PUBLIC_URL=.*|PUBLIC_URL=https://$DOMAIN|" .env
-  echo "  أُنشئ .env بسرّ جلسة عشوائي — أكملي المفاتيح فيه قبل التشغيل."
+  echo "  أُنشئ .env بسرّ جلسة عشوائي — تبقى المفاتيح فيه قبل التشغيل."
 fi
 chmod 600 "$APP_DIR/.env"
 
@@ -120,8 +120,8 @@ echo
 echo "✓ تم. الخطوات المتبقية:"
 echo "   ١. املئي المفاتيح:  sudo -u wabot nano $APP_DIR/.env"
 echo "   ٢. إن كانت قاعدة جديدة:  cd $APP_DIR && sudo -u wabot node src/seed.ts"
-echo "   ٣. أعيدي التشغيل:   sudo systemctl restart wa-bot"
-echo "   ٤. تابعي السجل:     sudo journalctl -u wa-bot -f"
+echo "   ٣. إعادة التشغيل:   sudo systemctl restart wa-bot"
+echo "   ٤. متابعة السجل:    sudo journalctl -u wa-bot -f"
 echo
 echo "   ملاحظة: النظام يستمع على 127.0.0.1 فقط، ولا يصله أحد إلا عبر Caddy"
 echo "           على 443 بشهادة HTTPS. المنفذ 4000 غير مكشوف للإنترنت."
