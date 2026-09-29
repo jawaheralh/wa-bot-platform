@@ -115,6 +115,8 @@ async function openThread(conversationId, main, staff) {
       </h3>
       ${conversation.handoff_reason ? `<p class="muted">سبب آخر تحويل: ${esc(conversation.handoff_reason)}</p>` : ''}
 
+      ${silenceNotice(conversation)}
+
       ${
         viewer
           ? `<div class="error">⚠️ ${esc(viewer.display_name)} فتح هذه المحادثة قبل ${
@@ -166,6 +168,7 @@ async function openThread(conversationId, main, staff) {
       <div class="actions">
         <button class="btn" id="send">إرسال</button>
         <button class="btn ghost" id="toggle">${conversation.bot_enabled ? 'إيقاف البوت' : 'تشغيل البوت'}</button>
+        <button class="btn ghost" id="wake" hidden>أعيدي البوت الآن</button>
         <button class="btn ghost" id="markTest" title="الموسوم وحده يُحذف بزر «حذف بيانات التجربة»">
           ${conversation.is_test ? '✓ موسومة تجريبية' : 'وسم كتجربة'}
         </button>
@@ -210,6 +213,25 @@ async function openThread(conversationId, main, staff) {
    * لا يحذف شيئاً بنفسه — يجعل المحادثة مؤهّلة للحذف بزر الأدمن.
    * الفصل بين الوسم والحذف مقصود: خطوتان لفعلٍ لا يُسترجع.
    */
+  /**
+   * إعادة البوت قبل انتهاء مدة الصمت.
+   *
+   * البوت يصمت بعد التحويل أو بعد رد الموظف — وهذا مقصود لئلا يقاطع
+   * الموظفَ وهو يعالج الحالة. لكن حين يتبيّن أن لا حاجة للتدخّل كان
+   * الوحيد سبيلٌ هو الانتظار ساعتين: زرّ «إيقاف البوت» لا يفيد لأن
+   * البوت مفعَّل أصلاً، والصامت شيء آخر.
+   */
+  const wake = document.getElementById('wake');
+  if (wake && silentUntil(conversation)) {
+    wake.hidden = false;
+    wake.onclick = guard(async () => {
+      await post(`/api/tenants/${state.tenantId}/conversations/${conversationId}/bot`, { enabled: true });
+      flash('عاد البوت — سيرد على الرسالة القادمة.');
+      await renderConversations(main);
+      await openThread(conversationId, main, staff);
+    });
+  }
+
   document.getElementById('markTest').onclick = guard(async () => {
     const next = !conversation.is_test;
     await post(`/api/tenants/${state.tenantId}/conversations/${conversationId}/test`, { isTest: next });
@@ -217,4 +239,39 @@ async function openThread(conversationId, main, staff) {
     await renderConversations(main);
     await openThread(conversationId, main, staff);
   });
+}
+
+
+/* ---------------------------------------------------------------
+   الصمت المؤقت
+--------------------------------------------------------------- */
+
+/** وقت انتهاء الصمت إن كان قائماً، وإلا لا شيء. */
+function silentUntil(conversation) {
+  const until = conversation.silent_until;
+  if (!until) return null;
+  // الختم بتوقيت الرياض بصيغة SQLite؛ نقارنه بالوقت نفسه صيغةً.
+  const nowRiyadh = new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 19).replace('T', ' ');
+  return until > nowRiyadh ? until : null;
+}
+
+/**
+ * يشرح الصمت بدل أن يتركه لغزاً.
+ *
+ * شارة «صامت مؤقتاً» وحدها لا تكفي: تظهر بلا سبب ولا مدة، فتبدو
+ * اللوحة وكأن البوت معطّل — ويُفتَح بلاغ عطل لا وجود له.
+ */
+function silenceNotice(conversation) {
+  const until = silentUntil(conversation);
+  if (!until) return '';
+  const time = until.slice(11, 16);
+  return `
+    <div class="warn-box">
+      🔇 <strong>البوت صامت في هذه المحادثة حتى ${esc(time)}</strong>
+      <p class="muted" style="margin:6px 0 0">
+        يصمت تلقائياً بعد التحويل لموظف أو بعد ردّ يدوي، حتى لا يقاطع
+        الموظف وهو يعالج الحالة. رسائل العميل تصل وتُحفظ، ولا يُرد
+        عليها آلياً. اضغطي «أعيدي البوت الآن» إن لم تعد هناك حاجة للتدخّل.
+      </p>
+    </div>`;
 }

@@ -184,3 +184,12 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--green); out
 
 .btn.ghost { background: transparent; color: var(--ink, #223); border: 1px solid var(--line, #dde3e8) }
 .btn.danger { background: var(--danger, #c2410c) }
+
+/* تنبيه داخل بطاقة — أهدأ من .error وأوضح من .muted */
+.warn-box {
+  background: #fdf7ea;
+  border: 1px solid #f0dcb4;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 10px 0;
+}
