@@ -159,7 +159,7 @@ export function loadConfig(): AppConfig {
     publicPanel: str('PUBLIC_PANEL', '0') === '1',
     redactPii: str('REDACT_PII', '1') === '1',
     followup: str('FOLLOWUP', '1') === '1',
-    brandName: str('BRAND_NAME', 'رُدود'),
+    brandName: str('BRAND_NAME', 'واتصال'),
     sharedMetaFallback: str('SHARED_META_FALLBACK', '0') === '1',
     dbPath: str('DB_PATH', join(ROOT, 'data', 'app.db')),
     sessionSecret,
