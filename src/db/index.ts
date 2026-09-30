@@ -10,6 +10,7 @@ import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { CORE_TABLES, CORE_COLUMNS } from './schema.ts';
+import { decryptSecret, encryptSecret, currentKey } from '../secrets.ts';
 import { SQL_NOW, today, fromEpochSeconds } from '../time.ts';
 
 export type Db = Database.Database;
@@ -176,24 +177,48 @@ export function toInternational(raw: string, countryCode = '966'): string {
   return digits;
 }
 
+/**
+ * صفّ المنشأة كما يراه بقية النظام: أسراره مفكوكة.
+ *
+ * التشفير شأن التخزين وحده. ولو تُرك لكل مستهلك لَنسيه أحدهم يوماً
+ * فأرسل توكناً مشفَّراً إلى Meta.
+ */
+function reveal<T extends TenantRow | undefined>(row: T): T {
+  if (!row) return row;
+  const key = currentKey();
+  row.wa_access_token = decryptSecret(row.wa_access_token, key);
+  row.wa_app_secret = decryptSecret(row.wa_app_secret, key);
+  row.anthropic_api_key = decryptSecret(row.anthropic_api_key, key);
+  return row;
+}
+
+/** يشفّر سرّاً قبل كتابته. يُصدَّر لأن المسارات هي من تكتب. */
+export function sealSecret(value: string | null | undefined): string | null {
+  return encryptSecret(value, currentKey());
+}
+
 export function findTenantByNumber(db: Db, waNumber: string): TenantRow | undefined {
-  return db
-    .prepare(`SELECT * FROM tenants WHERE wa_number = ? AND status = 'active'`)
-    .get(normalizeNumber(waNumber)) as TenantRow | undefined;
+  return reveal(
+    db
+      .prepare(`SELECT * FROM tenants WHERE wa_number = ? AND status = 'active'`)
+      .get(normalizeNumber(waNumber)) as TenantRow | undefined,
+  );
 }
 
 export function findTenantByPhoneNumberId(db: Db, phoneNumberId: string): TenantRow | undefined {
-  return db
-    .prepare(`SELECT * FROM tenants WHERE wa_phone_number_id = ? AND status = 'active'`)
-    .get(phoneNumberId) as TenantRow | undefined;
+  return reveal(
+    db
+      .prepare(`SELECT * FROM tenants WHERE wa_phone_number_id = ? AND status = 'active'`)
+      .get(phoneNumberId) as TenantRow | undefined,
+  );
 }
 
 export function getTenant(db: Db, id: number): TenantRow | undefined {
-  return db.prepare('SELECT * FROM tenants WHERE id = ?').get(id) as TenantRow | undefined;
+  return reveal(db.prepare('SELECT * FROM tenants WHERE id = ?').get(id) as TenantRow | undefined);
 }
 
 export function listTenants(db: Db): TenantRow[] {
-  return db.prepare('SELECT * FROM tenants ORDER BY id').all() as TenantRow[];
+  return (db.prepare('SELECT * FROM tenants ORDER BY id').all() as TenantRow[]).map((row) => reveal(row));
 }
 
 /* ---------------------------------------------------------------

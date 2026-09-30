@@ -8,7 +8,7 @@
 import type { FastifyInstance } from 'fastify';
 import { requireSystemAdmin } from '../auth.ts';
 import { createTenant, createUser } from '../../tenants.ts';
-import { listTenants, getTenant, normalizeNumber, type Db } from '../../db/index.ts';
+import { listTenants, getTenant, normalizeNumber, sealSecret, type Db } from '../../db/index.ts';
 import type { AppConfig } from '../../config.ts';
 import { setEnabled, statusFor } from '../../modules/registry.ts';
 import { readEnvFile, writeEnvFile, maskSecret } from '../../env-file.ts';
@@ -103,15 +103,16 @@ export function registerSystemRoutes(
     ).run(
       // السرّ المحجوب المُعاد كما هو لا يُكتب فوق الأصل.
       body.waAccessToken !== undefined && !body.waAccessToken.includes('…') ? 1 : 0,
-      body.waAccessToken?.trim() || null,
+      // يُشفَّر قبل أن يلمس القرص — القاعدة لا ترى نصّاً صريحاً.
+      sealSecret(body.waAccessToken?.trim()),
       body.waAppSecret !== undefined && !body.waAppSecret.includes('…') ? 1 : 0,
-      body.waAppSecret?.trim() || null,
+      sealSecret(body.waAppSecret?.trim()),
       body.waAppId !== undefined ? 1 : 0,
       body.waAppId?.trim() || null,
       body.waBusinessId !== undefined ? 1 : 0,
       body.waBusinessId?.trim() || null,
       body.anthropicApiKey !== undefined && !body.anthropicApiKey.includes('…') ? 1 : 0,
-      body.anthropicApiKey?.trim() || null,
+      sealSecret(body.anthropicApiKey?.trim()),
       body.name?.trim() || null,
       body.waNumber ? normalizeNumber(body.waNumber) : null,
       body.waPhoneNumberId?.trim() || null,
