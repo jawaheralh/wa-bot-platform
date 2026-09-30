@@ -101,9 +101,21 @@ function metaTemplates(): Response {
   );
 }
 
+/**
+ * القوالب حافّة على حساب واتساب للأعمال لا على النشاط التجاري، فكل
+ * قراءة تسبقها استعلامة اشتقاق. وردٌّ واحد لكل النداءات يجعل الاشتقاق
+ * يقرأ قائمة القوالب فلا يجد فيها معرّفاً.
+ */
+function metaWithWaba() {
+  return async (url: string | URL | Request) =>
+    String(url).includes('owned_whatsapp_business_accounts')
+      ? new Response(JSON.stringify({ data: [{ id: 'WABA-1', name: 'منشأة' }] }), { status: 200 })
+      : metaTemplates();
+}
+
 describe('قائمة القوالب', () => {
   it('المعتمد وحده يُعرض — والمعلّق يُخفى', async () => {
-    vi.stubGlobal('fetch', async () => metaTemplates());
+    vi.stubGlobal('fetch', metaWithWaba());
 
     const response = await server.inject({
       method: 'GET',
@@ -118,7 +130,7 @@ describe('قائمة القوالب', () => {
   });
 
   it('وعدد المتغيّرات يُستخرج من المتن', async () => {
-    vi.stubGlobal('fetch', async () => metaTemplates());
+    vi.stubGlobal('fetch', metaWithWaba());
     const response = await server.inject({
       method: 'GET',
       url: `/api/tenants/${tenantId}/templates`,

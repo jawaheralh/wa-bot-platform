@@ -47,6 +47,8 @@ export const ACTION_AR: Record<string, string> = {
   login_failed: 'محاولة دخول فاشلة',
   status_change: 'تغيير حالة',
   case_created: 'تسجيل شكوى أو طلب يدوياً',
+  template_created: 'إنشاء قالب واتساب',
+  template_deleted: 'حذف قالب واتساب',
   manual_reply: 'رد يدوي',
   assign: 'إسناد محادثة',
   bot_toggle: 'إيقاف/تشغيل البوت',

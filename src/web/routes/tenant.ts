@@ -45,6 +45,14 @@ import { parseFields, validateValues, readValues } from '../../case-fields.ts';
 import { PERMISSIONS } from '../../permissions.ts';
 import { readBranding, saveColors, storeLogo, removeLogo, readLogo, paletteFor } from '../../branding.ts';
 import { readProfile, updateProfile, setPhoto, VERTICALS } from '../../wa-profile.ts';
+import {
+  createTemplate,
+  deleteTemplate,
+  listAllTemplates,
+  CATEGORY_AR,
+  CATEGORIES as TEMPLATE_CATEGORIES,
+  SUGGESTED,
+} from '../../wa-templates.ts';
 import { credentialsFor } from '../../tenant-meta.ts';
 
 interface Params {
@@ -983,6 +991,73 @@ export function registerTenantRoutes(
    * الرقم يُقبل مباشرة لأن هذا هو الغرض: مراسلة من لم يراسلنا. وتُنشأ
    * له محادثة لتُحفظ الرسالة في مكانها بدل أن تضيع بلا أثر.
    */
+  /* --- إنشاء القوالب وإدارتها --- */
+
+  /**
+   * كل القوالب بحالاتها — للمالك وحده.
+   *
+   * القالب يكلّف مالاً عند الإرسال، وحذفه يوقف رسائل تعتمد عليه.
+   */
+  app.get('/api/tenants/:tenantId/templates/all', async (request) => {
+    const id = adminOf(request);
+    const tenant = getTenant(db, id);
+    if (!tenant) throw Object.assign(new Error('المنشأة غير موجودة.'), { statusCode: 404 });
+
+    const result = await listAllTemplates(config, credentialsFor(config, tenant));
+    return { ...result, categories: CATEGORY_AR, suggested: SUGGESTED };
+  });
+
+  app.post('/api/tenants/:tenantId/templates', async (request, reply) => {
+    const id = adminOf(request);
+    const tenant = getTenant(db, id);
+    if (!tenant) throw Object.assign(new Error('المنشأة غير موجودة.'), { statusCode: 404 });
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const result = await createTemplate(config, credentialsFor(config, tenant), {
+      name: String(body.name ?? ''),
+      language: String(body.language ?? 'ar'),
+      category: (TEMPLATE_CATEGORIES as readonly string[]).includes(String(body.category))
+        ? (String(body.category) as never)
+        : 'UTILITY',
+      body: String(body.body ?? ''),
+      header: body.header === undefined ? undefined : String(body.header),
+      footer: body.footer === undefined ? undefined : String(body.footer),
+      examples: Array.isArray(body.examples) ? body.examples.map((e) => String(e ?? '')) : [],
+    });
+
+    if (!result.ok) throw Object.assign(new Error(result.message), { statusCode: 400 });
+
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username,
+      action: 'template_created',
+      target: String(body.name ?? ''),
+      ip: request.ip,
+    });
+    return reply.code(201).send(result);
+  });
+
+  app.delete('/api/tenants/:tenantId/templates/:name', async (request) => {
+    const id = adminOf(request);
+    const tenant = getTenant(db, id);
+    if (!tenant) throw Object.assign(new Error('المنشأة غير موجودة.'), { statusCode: 404 });
+
+    const name = String((request.params as { name: string }).name);
+    const result = await deleteTemplate(config, credentialsFor(config, tenant), name);
+    if (!result.ok) throw Object.assign(new Error(result.message), { statusCode: 400 });
+
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username,
+      action: 'template_deleted',
+      target: name,
+      ip: request.ip,
+    });
+    return result;
+  });
+
   app.post('/api/tenants/:tenantId/templates/send', async (request) => {
     const id = allowed('templates')(request);
     if (!provider.sendTemplate) {

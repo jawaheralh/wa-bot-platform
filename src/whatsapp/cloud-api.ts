@@ -14,6 +14,7 @@ import type { FastifyInstance } from 'fastify';
 import type { AppConfig } from '../config.ts';
 import { findTenantByPhoneNumberId, getTenant, normalizeNumber, type Db, type TenantRow } from '../db/index.ts';
 import { credentialsFor, allAppSecrets } from '../tenant-meta.ts';
+import { resolveWaba } from '../waba.ts';
 import type { Logger } from '../logger.ts';
 import type {
   IncomingMessage,
@@ -273,12 +274,18 @@ export class CloudApiProvider implements WhatsAppProvider {
     if (!tenant) throw new Error('المنشأة غير موجودة.');
 
     const credentials = credentialsFor(this.config, tenant);
-    if (!credentials.accessToken || !credentials.businessId) {
-      throw new Error('يلزم توكن المنشأة ومعرّف نشاطها التجاري لقراءة القوالب.');
-    }
+
+    /**
+     * القوالب حافّة على حساب واتساب للأعمال لا على النشاط التجاري.
+     *
+     * وكان المعرّف يُستعمل هنا كما هو، فتُرفض القراءة بـ«(#100)» لكل
+     * منشأة أدخلت معرّف نشاطها — وهو ما تعرضه واجهة Meta.
+     */
+    const waba = await resolveWaba(this.config, credentials);
+    if (!waba.ok) throw new Error(waba.message);
 
     const url =
-      `https://graph.facebook.com/${this.config.cloud.graphVersion}/${credentials.businessId}` +
+      `https://graph.facebook.com/${this.config.cloud.graphVersion}/${waba.id}` +
       `/message_templates?limit=100&access_token=${encodeURIComponent(credentials.accessToken)}`;
 
     const response = await fetch(url);
