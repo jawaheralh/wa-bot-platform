@@ -24,10 +24,14 @@ import { listStaff, addStaff, updateStaff, ROLE_AR } from '../../staff.ts';
 import { statusFor, setConfig, getModule } from '../../modules/registry.ts';
 import {
   listComplaints,
+  createComplaint,
   updateComplaintStatus,
   complaintUpdateText,
   STATUSES,
+  CATEGORIES,
+  SEVERITIES,
   type Status,
+  type ComplaintRow,
 } from '../../modules/complaints.ts';
 import { audit, listAudit, deleteCustomerData, exportCustomerData, ACTION_AR } from '../../compliance.ts';
 import { getConfig } from '../../modules/registry.ts';
@@ -37,6 +41,7 @@ import type { AppConfig } from '../../config.ts';
 import type { WhatsAppProvider } from '../../whatsapp/provider.ts';
 import { SQL_NOW } from '../../time.ts';
 import { requirePermission } from '../auth.ts';
+import { parseFields, validateValues, readValues } from '../../case-fields.ts';
 import { PERMISSIONS } from '../../permissions.ts';
 import { readBranding, saveColors, storeLogo, removeLogo, readLogo, paletteFor } from '../../branding.ts';
 import { readProfile, updateProfile, setPhoto, VERTICALS } from '../../wa-profile.ts';
@@ -71,6 +76,14 @@ export function registerTenantRoutes(
     const id = Number((request.params as Params).tenantId);
     if (!Number.isFinite(id)) throw Object.assign(new Error('رقم منشأة غير صالح.'), { statusCode: 400 });
     return requireTenantAdmin(request as never, id);
+  };
+
+  /** إعداد وحدة الشكاوى لهذه المنشأة. */
+  const complaintsConfig = (tenantId: number): { fields: string } => {
+    const row = db
+      .prepare(`SELECT config FROM tenant_modules WHERE tenant_id = ? AND module = 'complaints'`)
+      .get(tenantId) as { config: string } | undefined;
+    return { fields: '', ...(JSON.parse(row?.config ?? '{}') as { fields?: string }) };
   };
 
   /* --- نظرة عامة --- */
@@ -321,6 +334,88 @@ export function registerTenantRoutes(
     const id = tenantOf(request);
     const status = (request.query as { status?: string })?.status;
     return listComplaints(db, id, STATUSES.includes(status as Status) ? (status as Status) : undefined);
+  });
+
+  /** تعريف الحقول الإضافية للشكاوى. */
+  app.get('/api/tenants/:tenantId/complaints/fields', async (request) => {
+    const id = tenantOf(request);
+    return { fields: parseFields(complaintsConfig(id).fields) };
+  });
+
+  /**
+   * تسجيل شكوى بيد الموظف.
+   *
+   * الشكوى تصل بالهاتف وفي الفرع لا عبر واتساب وحده، وما لا يُسجَّل
+   * لا يُقاس ولا يُتابَع.
+   */
+  app.post('/api/tenants/:tenantId/complaints', async (request, reply) => {
+    const id = allowed('cases')(request);
+    const body = (request.body ?? {}) as Record<string, unknown>;
+
+    const summary = String(body.summary ?? '').trim();
+    if (!summary) throw Object.assign(new Error('وصف الشكوى مطلوب.'), { statusCode: 400 });
+
+    const customerWa = toInternational(String(body.customerWa ?? ''));
+    if (customerWa.length < 8) throw Object.assign(new Error('رقم العميل غير صالح.'), { statusCode: 400 });
+
+    const checked = validateValues(parseFields(complaintsConfig(id).fields), body.extra);
+    if (checked.error) throw Object.assign(new Error(checked.error), { statusCode: 400 });
+
+    const conversation = db
+      .prepare('SELECT id FROM conversations WHERE tenant_id = ? AND customer_wa = ?')
+      .get(id, customerWa) as { id: number } | undefined;
+
+    const row = createComplaint(db, {
+      tenantId: id,
+      conversationId: conversation?.id ?? null,
+      customerWa,
+      summary,
+      category: CATEGORIES.includes(body.category as never) ? (body.category as never) : 'other',
+      severity: SEVERITIES.includes(body.severity as never) ? (body.severity as never) : 'medium',
+      extra: checked.values,
+    });
+
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username,
+      action: 'case_created',
+      target: row.reference,
+      ip: request.ip,
+    });
+    return reply.code(201).send(row);
+  });
+
+  /** تعديل ما كُتب: الوصف والتصنيف والخطورة والحقول الإضافية. */
+  app.patch('/api/tenants/:tenantId/complaints/:complaintId/details', async (request) => {
+    const id = allowed('cases')(request);
+    const complaintId = Number((request.params as Params & { complaintId: string }).complaintId);
+    const body = (request.body ?? {}) as Record<string, unknown>;
+
+    const row = db
+      .prepare('SELECT * FROM complaints WHERE id = ? AND tenant_id = ?')
+      .get(complaintId, id) as ComplaintRow | undefined;
+    if (!row) throw Object.assign(new Error('الشكوى غير موجودة.'), { statusCode: 404 });
+
+    const checked = validateValues(parseFields(complaintsConfig(id).fields), body.extra, readValues(row.extra));
+    if (checked.error) throw Object.assign(new Error(checked.error), { statusCode: 400 });
+
+    const summary = body.summary === undefined ? row.summary : String(body.summary).trim();
+    if (!summary) throw Object.assign(new Error('وصف الشكوى مطلوب.'), { statusCode: 400 });
+
+    db.prepare(
+      `UPDATE complaints SET summary = ?, category = ?, severity = ?, extra = ?, updated_at = ${SQL_NOW}
+       WHERE id = ? AND tenant_id = ?`,
+    ).run(
+      summary,
+      CATEGORIES.includes(body.category as never) ? body.category : row.category,
+      SEVERITIES.includes(body.severity as never) ? body.severity : row.severity,
+      JSON.stringify(checked.values),
+      complaintId,
+      id,
+    );
+
+    return db.prepare('SELECT * FROM complaints WHERE id = ?').get(complaintId) as ComplaintRow;
   });
 
   app.patch('/api/tenants/:tenantId/complaints/:complaintId', async (request) => {

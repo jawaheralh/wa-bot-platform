@@ -6,7 +6,7 @@
  * والـprompt، وتوجيه نداء الأداة لصاحبها — يعمل تلقائياً بعده.
  */
 
-import type { Db, TenantRow } from '../db/index.ts';
+import { ensureColumn, type Db, type TenantRow } from '../db/index.ts';
 import type { BotModule, ModuleConfig, ModuleContext, ToolDefinition, ToolResult } from './types.ts';
 import { SQL_NOW } from '../time.ts';
 
@@ -52,6 +52,12 @@ export function coreModules(): BotModule[] {
 export function migrateAll(db: Db): void {
   for (const module of MODULES) {
     for (const statement of module.tables) db.exec(statement);
+  }
+  // بعد الجداول كلها: عمودٌ قد يُضاف لجدول وحدة أخرى.
+  for (const module of MODULES) {
+    for (const [table, column, definition] of module.columns ?? []) {
+      ensureColumn(db, table, column, definition);
+    }
   }
 }
 

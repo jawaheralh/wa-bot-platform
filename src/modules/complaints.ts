@@ -8,6 +8,7 @@
 
 import type { BotModule, ModuleConfig, ModuleContext, ToolDefinition, ToolResult } from './types.ts';
 import { readString, readEnum } from './types.ts';
+import { parseFields, fieldsToText, toolProperties, validateValues, describeValues, type FieldValues } from '../case-fields.ts';
 import { nextReference, type Db } from '../db/index.ts';
 import { SQL_NOW } from '../time.ts';
 
@@ -37,6 +38,8 @@ export const STATUS_AR: Record<Status, string> = {
 };
 
 export interface ComplaintRow {
+  /** قيم الحقول الإضافية، JSON. */
+  extra?: string | null;
   id: number;
   tenant_id: number;
   conversation_id: number | null;
@@ -59,12 +62,15 @@ interface ComplaintsConfig extends ModuleConfig {
   escalateFrom: Severity;
   /** نص إضافي يُضاف لرسالة تأكيد الشكوى (مثلاً: مدة الرد المتوقعة). */
   acknowledgement: string;
+  /** حقول إضافية — سطرٌ لكل حقل: «التسمية* | النوع | الخيارات». */
+  fields: string;
 }
 
 const DEFAULTS: ComplaintsConfig = {
   notifyCustomer: true,
   escalateFrom: 'high',
   acknowledgement: 'راح يتواصل معك المسؤول في أقرب وقت.',
+  fields: '',
 };
 
 const SEVERITY_RANK: Record<Severity, number> = { low: 1, medium: 2, high: 3 };
@@ -82,13 +88,14 @@ export function createComplaint(
     summary: string;
     category: Category;
     severity: Severity;
+    extra?: FieldValues;
   },
 ): ComplaintRow {
   const reference = nextReference(db, 'SHK', input.tenantId);
   const info = db
     .prepare(
-      `INSERT INTO complaints (tenant_id, conversation_id, reference, customer_wa, summary, category, severity)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO complaints (tenant_id, conversation_id, reference, customer_wa, summary, category, severity, extra)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       input.tenantId,
@@ -98,6 +105,7 @@ export function createComplaint(
       input.summary,
       input.category,
       input.severity,
+      JSON.stringify(input.extra ?? {}),
     );
   return db.prepare('SELECT * FROM complaints WHERE id = ?').get(info.lastInsertRowid) as ComplaintRow;
 }
@@ -165,11 +173,15 @@ export const complaintsModule: BotModule = {
     `CREATE INDEX IF NOT EXISTS idx_complaints_tenant ON complaints(tenant_id, status, id DESC)`,
   ],
 
+  // قيم الحقول الإضافية التي يعرّفها المالك — JSON.
+  columns: [['complaints', 'extra', 'TEXT']],
+
   defaultConfig: () => ({ ...DEFAULTS }),
 
   validateConfig(input) {
     const raw = (input ?? {}) as Partial<ComplaintsConfig>;
     return {
+      fields: fieldsToText(parseFields(raw.fields)),
       notifyCustomer: raw.notifyCustomer !== false,
       escalateFrom: SEVERITIES.includes(raw.escalateFrom as Severity)
         ? (raw.escalateFrom as Severity)
@@ -259,7 +271,8 @@ export const complaintsModule: BotModule = {
     return ['## شكاوى هذا العميل المسجّلة', ...lines].join('\n');
   },
 
-  tools(): ToolDefinition[] {
+  tools(ctx: ModuleContext): ToolDefinition[] {
+    const config = ctx.config as ComplaintsConfig;
     return [
       {
         name: 'create_complaint',
@@ -279,8 +292,16 @@ export const complaintsModule: BotModule = {
               enum: [...SEVERITIES],
               description: 'خطورة الشكوى بحسب تضرر العميل ونبرته.',
             },
+            ...toolProperties(parseFields(config.fields)),
           },
-          required: ['summary', 'category', 'severity'],
+          required: [
+            'summary',
+            'category',
+            'severity',
+            ...parseFields(config.fields)
+              .filter((f) => f.required)
+              .map((f) => f.key),
+          ],
         },
       },
       {
@@ -309,6 +330,12 @@ export const complaintsModule: BotModule = {
       const category = readEnum(input, 'category', CATEGORIES, 'other');
       const severity = readEnum(input, 'severity', SEVERITIES, 'medium');
 
+      const defs = parseFields((ctx.config as ComplaintsConfig).fields);
+      const checked = validateValues(defs, input);
+      if (checked.error) {
+        return { content: `${checked.error} اسأل العميل عنه ثم أعد المحاولة.`, isError: true };
+      }
+
       const complaint = createComplaint(ctx.db, {
         tenantId: ctx.tenant.id,
         conversationId: ctx.conversation.id,
@@ -316,6 +343,7 @@ export const complaintsModule: BotModule = {
         summary,
         category,
         severity,
+        extra: checked.values,
       });
 
       ctx.db.prepare(`UPDATE complaints SET notified_status = 'new' WHERE id = ?`).run(complaint.id);

@@ -11,7 +11,16 @@
 
 import type { BotModule, ModuleConfig, ModuleContext, ModuleDeps, ToolDefinition, ToolResult } from './types.ts';
 import { readString, readEnum } from './types.ts';
-import { nextReference, type Db } from '../db/index.ts';
+import {
+  parseFields,
+  fieldsToText,
+  toolProperties,
+  validateValues,
+  readValues,
+  describeValues,
+  type FieldValues,
+} from '../case-fields.ts';
+import { nextReference, toInternational, type Db } from '../db/index.ts';
 import { SQL_NOW, formatDateTimeAr } from '../time.ts';
 
 export const KINDS = ['maintenance', 'subscription', 'quote', 'visit', 'supply', 'other'] as const;
@@ -51,6 +60,8 @@ const STATUS_MESSAGE: Record<Status, string> = {
 };
 
 export interface RequestRow {
+  /** قيم الحقول الإضافية، JSON. */
+  extra?: string | null;
   id: number;
   tenant_id: number;
   conversation_id: number | null;
@@ -74,12 +85,18 @@ interface RequestsConfig extends ModuleConfig {
   kinds: Kind[];
   /** يُضاف لرسالة التسجيل (مثل مدة الاستجابة المتوقعة). */
   acknowledgement: string;
+  /**
+   * حقول إضافية تخصّ هذه المنشأة — سطرٌ لكل حقل:
+   * «التسمية* | النوع | الخيارات». النجمة تعني إلزامياً.
+   */
+  fields: string;
 }
 
 const DEFAULTS: RequestsConfig = {
   notifyCustomer: true,
   kinds: [...KINDS],
   acknowledgement: 'راح نتواصل معك عند أي تحديث.',
+  fields: '',
 };
 
 /* ---------------------------------------------------------------
@@ -96,13 +113,14 @@ export function createRequest(
     kind: Kind;
     priority: Priority;
     summary: string;
+    extra?: FieldValues;
   },
 ): RequestRow {
   const reference = nextReference(db, 'TLB', input.tenantId);
   const info = db
     .prepare(
-      `INSERT INTO requests (tenant_id, conversation_id, reference, customer_wa, customer_name, kind, priority, summary)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO requests (tenant_id, conversation_id, reference, customer_wa, customer_name, kind, priority, summary, extra)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       input.tenantId,
@@ -113,6 +131,7 @@ export function createRequest(
       input.kind,
       input.priority,
       input.summary,
+      JSON.stringify(input.extra ?? {}),
     );
   return db.prepare('SELECT * FROM requests WHERE id = ?').get(info.lastInsertRowid) as RequestRow;
 }
@@ -268,6 +287,9 @@ export const requestsModule: BotModule = {
     `CREATE INDEX IF NOT EXISTS idx_requests_tenant ON requests(tenant_id, status, id DESC)`,
   ],
 
+  // قيم الحقول الإضافية التي يعرّفها المالك — JSON.
+  columns: [['requests', 'extra', 'TEXT']],
+
   defaultConfig: () => structuredClone(DEFAULTS),
 
   validateConfig(input) {
@@ -278,6 +300,8 @@ export const requestsModule: BotModule = {
     if (!kinds.length) throw new Error('يلزم نوع طلب واحد على الأقل.');
 
     return {
+      // يُعاد تدوير النصّ عبر المحلّل فيُصحَّح شكله ويُسقط المعطوب منه.
+      fields: fieldsToText(parseFields(raw.fields)),
       notifyCustomer: raw.notifyCustomer !== false,
       kinds,
       acknowledgement:
@@ -378,8 +402,17 @@ export const requestsModule: BotModule = {
             kind: { type: 'string', enum: [...config.kinds], description: 'نوع الطلب.' },
             priority: { type: 'string', enum: [...PRIORITIES], description: 'عاجل أم عادي.' },
             customer_name: { type: 'string', description: 'اسم العميل إن ذكره.' },
+            // ما يعرّفه المالك يسأل عنه البوت — بلا سطر إضافي هنا ولا في اللوحة.
+            ...toolProperties(parseFields(config.fields)),
           },
-          required: ['summary', 'kind', 'priority'],
+          required: [
+            'summary',
+            'kind',
+            'priority',
+            ...parseFields(config.fields)
+              .filter((f) => f.required)
+              .map((f) => f.key),
+          ],
         },
       },
       {
@@ -408,6 +441,13 @@ export const requestsModule: BotModule = {
       const kind = readEnum(input, 'kind', config.kinds, config.kinds[0] ?? 'other');
       const priority = readEnum(input, 'priority', PRIORITIES, 'normal');
 
+      const defs = parseFields(config.fields);
+      const checked = validateValues(defs, input);
+      if (checked.error) {
+        // النموذج يُخبَر بما نقص ليسأل العميل عنه، لا ليخترعه.
+        return { content: `${checked.error} اسأل العميل عنه ثم أعد المحاولة.`, isError: true };
+      }
+
       const row = createRequest(ctx.db, {
         tenantId: ctx.tenant.id,
         conversationId: ctx.conversation.id,
@@ -416,6 +456,7 @@ export const requestsModule: BotModule = {
         kind,
         priority,
         summary,
+        extra: checked.values,
       });
 
       // العميل في المحادثة الآن، والبوت سيذكر الرقم في ردّه — فلا نرسل
@@ -462,6 +503,14 @@ export const requestsModule: BotModule = {
 
   /* --- مسارات الأدمن --- */
   routes(app, deps) {
+    /** إعداد الوحدة لهذه المنشأة، مع الافتراضيات لما لم يُضبط. */
+    const tenantConfig = (db: Db, tenantId: number): RequestsConfig => {
+      const row = db
+        .prepare(`SELECT config FROM tenant_modules WHERE tenant_id = ? AND module = 'requests'`)
+        .get(tenantId) as { config: string } | undefined;
+      return { ...DEFAULTS, ...(JSON.parse(row?.config ?? '{}') as Partial<RequestsConfig>) };
+    };
+
     const access = (request: { params: unknown; user?: { role: string; tenantId: number | null } }): number => {
       const tenantId = Number((request.params as { tenantId: string }).tenantId);
       const user = request.user;
@@ -479,6 +528,95 @@ export const requestsModule: BotModule = {
         statuses: STATUS_AR,
         kinds: KIND_AR,
       };
+    });
+
+    /** تعريف الحقول الإضافية — تحتاجه شاشة الإنشاء والتعديل. */
+    app.get('/api/tenants/:tenantId/requests/fields', async (request) => {
+      const tenantId = access(request);
+      return { fields: parseFields(tenantConfig(deps.db, tenantId).fields) };
+    });
+
+    /**
+     * إنشاء طلب بيد الموظف.
+     *
+     * ليس كل طلب يأتي من محادثة: يتصل العميل هاتفياً أو يحضر إلى الفرع،
+     * فيُسجّل الموظف طلبه هنا. والمحادثة تُربط إن كان للرقم محادثة
+     * قائمة، فيبقى السجل واحداً لا سجلَّين للعميل نفسه.
+     */
+    app.post('/api/tenants/:tenantId/requests', async (request, reply) => {
+      const tenantId = access(request);
+      const body = (request.body ?? {}) as Record<string, unknown>;
+
+      const summary = String(body.summary ?? '').trim();
+      if (!summary) throw Object.assign(new Error('وصف الطلب مطلوب.'), { statusCode: 400 });
+
+      const customerWa = toInternational(String(body.customerWa ?? ''));
+      if (customerWa.length < 8) throw Object.assign(new Error('رقم العميل غير صالح.'), { statusCode: 400 });
+
+      const config = tenantConfig(deps.db, tenantId);
+      const checked = validateValues(parseFields(config.fields), body.extra);
+      if (checked.error) throw Object.assign(new Error(checked.error), { statusCode: 400 });
+
+      const conversation = deps.db
+        .prepare('SELECT id, customer_name FROM conversations WHERE tenant_id = ? AND customer_wa = ?')
+        .get(tenantId, customerWa) as { id: number; customer_name: string | null } | undefined;
+
+      const row = createRequest(deps.db, {
+        tenantId,
+        conversationId: conversation?.id ?? null,
+        customerWa,
+        customerName: String(body.customerName ?? '').trim() || conversation?.customer_name || null,
+        kind: readEnum(body, 'kind', config.kinds, config.kinds[0] ?? 'other'),
+        priority: readEnum(body, 'priority', PRIORITIES, 'normal'),
+        summary,
+        extra: checked.values,
+      });
+
+      /**
+       * لا يُبلَّغ العميل تلقائياً هنا.
+       *
+       * الطلب المكتوب يدوياً قد يكون تدويناً لمكالمة انتهت، وإرسال
+       * «سُجّل طلبك» بعدها مباشرة يربك من لم يطلب شيئاً عبر واتساب.
+       * فالإرسال بزرّ صريح.
+       */
+      deps.logger.info('سُجّل طلب يدوياً', { مرجع: row.reference, موظف: request.user?.username ?? '' });
+      return reply.code(201).send(row);
+    });
+
+    /** تعديل ما كُتب: الوصف والنوع والأولوية والحقول الإضافية. */
+    app.patch('/api/tenants/:tenantId/requests/:requestId/details', async (request) => {
+      const tenantId = access(request);
+      const requestId = Number((request.params as { requestId: string }).requestId);
+      const body = (request.body ?? {}) as Record<string, unknown>;
+
+      const row = deps.db
+        .prepare('SELECT * FROM requests WHERE id = ? AND tenant_id = ?')
+        .get(requestId, tenantId) as RequestRow | undefined;
+      if (!row) throw Object.assign(new Error('الطلب غير موجود.'), { statusCode: 404 });
+
+      const config = tenantConfig(deps.db, tenantId);
+      // القيم السابقة تُمرَّر فلا يمحو التعديلُ الجزئي حقلاً لم يُرسل.
+      const checked = validateValues(parseFields(config.fields), body.extra, readValues(row.extra));
+      if (checked.error) throw Object.assign(new Error(checked.error), { statusCode: 400 });
+
+      const summary = body.summary === undefined ? row.summary : String(body.summary).trim();
+      if (!summary) throw Object.assign(new Error('وصف الطلب مطلوب.'), { statusCode: 400 });
+
+      deps.db
+        .prepare(
+          `UPDATE requests SET summary = ?, kind = ?, priority = ?, extra = ?, updated_at = ${SQL_NOW}
+           WHERE id = ? AND tenant_id = ?`,
+        )
+        .run(
+          summary,
+          body.kind === undefined ? row.kind : readEnum(body, 'kind', config.kinds, row.kind),
+          body.priority === undefined ? row.priority : readEnum(body, 'priority', PRIORITIES, row.priority),
+          JSON.stringify(checked.values),
+          requestId,
+          tenantId,
+        );
+
+      return deps.db.prepare('SELECT * FROM requests WHERE id = ?').get(requestId) as RequestRow;
     });
 
     /** تغيير الحالة — يُبلغ العميل تلقائياً على واتساب. */

@@ -73,6 +73,14 @@ export interface BotModule {
 
   /** جمل CREATE TABLE IF NOT EXISTS — تُنفَّذ عند الإقلاع حتى لو كانت الوحدة معطّلة. */
   tables: string[];
+  /**
+   * أعمدة تُضاف لجدول أصدرته الوحدة سابقاً.
+   *
+   * CREATE TABLE IF NOT EXISTS لا يضيف عموداً لجدول قائم، فقاعدةٌ
+   * أُنشئت قبل الميزة تبقى ناقصة بصمت. وهي هنا لا في جداول النواة
+   * لأن جداول الوحدات تُنشأ بعدها — فلا يجد العمودُ جدولَه.
+   */
+  columns?: [table: string, column: string, definition: string][];
 
   defaultConfig(): ModuleConfig;
   /** يتحقق مما يرسله الأدمن ويرمي Error برسالة عربية عند الخطأ. */
