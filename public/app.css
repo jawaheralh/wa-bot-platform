@@ -90,7 +90,58 @@ button { font-family: inherit; font-size: inherit; }
   font-family: inherit; margin-bottom: 14px; color: var(--ink);
 }
 
-main { flex: 1; padding: 22px 26px; min-width: 0; }
+/* العمود الأيسر: شريط علوي ثابت العرض ثم الصفحة */
+main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.page { flex: 1; padding: 22px 26px; min-width: 0; }
+
+/**
+ * الشريط العلوي.
+ *
+ * يحمل موضعك الآن وزرّ الإعدادات. ووجوده يُخرج من الشريط الجانبي كل
+ * ما لا يُفتح يومياً، فيبقى فيه عملُ الموظف وحده.
+ */
+.topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 26px;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+}
+.topbar-where { font-weight: 600; font-size: 15px; }
+.topbar-actions { display: flex; gap: 8px; margin-inline-start: auto; align-items: center; }
+
+/* فاصل بين شاشات المنصة وشاشات المنشأة في الشريط الجانبي */
+.nav-split {
+  height: 1px; background: rgba(255, 255, 255, 0.18);
+  margin: 10px 12px;
+}
+
+/* --- قائمة منسدلة --- */
+.menu-wrap { position: relative; }
+.menu {
+  position: absolute;
+  inset-inline-start: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  min-width: 190px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(59, 34, 41, 0.16);
+  padding: 6px;
+}
+.menu button {
+  display: block; width: 100%; text-align: right;
+  background: transparent; border: 0; cursor: pointer;
+  padding: 9px 12px; border-radius: 8px;
+  font: inherit; color: var(--ink);
+}
+.menu button:hover { background: var(--bg); }
+.menu button.on { background: var(--accent-soft); color: var(--accent-dark); font-weight: 600; }
+
+@media (max-width: 760px) {
+  .topbar { padding: 10px 16px; }
+  .page { padding: 16px; }
+}
 h2 { margin: 0 0 4px; font-size: 21px; font-weight: 700; }
 .subtitle { color: var(--muted); margin: 0 0 18px; font-size: 14px; }
 
@@ -174,8 +225,9 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
   display: flex;
   gap: 14px;
   /* ارتفاع ثابت ليتمرّر كل لوح وحده — بلا هذا تتمرّر الصفحة كلها
-     فتغيب قائمة الأسماء كلما طالت المحادثة. */
-  height: calc(100vh - 150px);
+     فتغيب قائمة الأسماء كلما طالت المحادثة. والطرح يشمل الشريط
+     العلوي وعنوان الشاشة وحشو الصفحة. */
+  height: calc(100vh - 215px);
   min-height: 440px;
 }
 
@@ -360,7 +412,6 @@ label.inline input { width: auto; }
 @media (max-width: 760px) {
   .layout { flex-direction: column; }
   .sidebar { width: 100%; flex: none; }
-  main { padding: 16px; }
 }
 
 /* --- التحقق بخطوتين --- */
