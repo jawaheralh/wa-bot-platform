@@ -25,6 +25,7 @@ import { renderBranding } from './views/branding.js';
 import { renderTemplates } from './views/templates.js';
 import { renderSatisfaction } from './views/satisfaction.js';
 import { renderBilling } from './views/billing.js';
+import { renderSettings } from './views/settings.js';
 
 /**
  * شاشتان لا قائمة واحدة.
@@ -120,34 +121,28 @@ function brandMark() {
 
 /** اسم الشاشة المفتوحة — يقول للموظف أين هو قبل أن يقرأ المحتوى. */
 function whereLabel(views) {
-  const known = [...views, ...PLATFORM_VIEWS, { id: 'account', label: 'حسابي' }];
+  const known = [
+    ...views,
+    ...PLATFORM_VIEWS,
+    { id: 'account', label: 'حسابي' },
+    { id: 'settings', label: 'الإعدادات' },
+  ];
   return known.find((v) => v.id === state.view)?.label ?? '';
 }
 
 /**
- * زرّ الإعدادات: قائمة تُفتح بالضغط.
+ * زرّ الإعدادات يقود لصفحة لا لقائمة منسدلة.
  *
- * ولا يُعرض أصلاً لمن لا إعداد له — الموظف يرى زراً فارغاً فيضغطه
- * مرة بعد مرة يظنّ أن فيه عطلاً.
+ * القائمة تعرض ثمانية أسماء مجرّدة، و«القوالب» وحدها لا تقول لمالكٍ
+ * جديد لماذا يحتاجها. والصفحة تسع تصنيفاً وسطرَ شرحٍ لكلٍّ منها.
+ *
+ * ولا يُعرض الزرّ لمن لا إعداد له — الموظف يضغط زراً فارغاً مرة بعد
+ * مرة يظنّ أن فيه عطلاً.
  */
 function settingsButton(views) {
-  const items = views.filter((v) => v.group === 'setup');
-  if (!items.length || !state.tenantId) return '';
-
-  return `
-    <div class="menu-wrap">
-      <button class="btn ghost small" id="settingsToggle" aria-haspopup="true" aria-expanded="false">
-        ⚙ الإعدادات
-      </button>
-      <div class="menu" id="settingsMenu" hidden>
-        ${items
-          .map(
-            (v) =>
-              `<button data-view="${v.id}" class="${state.view === v.id ? 'on' : ''}">${esc(v.label)}</button>`,
-          )
-          .join('')}
-      </div>
-    </div>`;
+  if (!views.some((v) => v.group === 'setup') || !state.tenantId) return '';
+  const active = state.view === 'settings' ? '' : ' ghost';
+  return `<button class="btn${active} small" data-view="settings">⚙ الإعدادات</button>`;
 }
 
 function visibleViews() {
@@ -164,7 +159,7 @@ function visibleViews() {
  * شاشات أدمن النظام: ليست في VIEWS لأنها لا تخص منشأة بعينها.
  * إغفالها هنا جعل الحارس أدناه يُعيدها إلى «نظرة عامة» عند كل ضغطة.
  */
-const SYSTEM_VIEWS = new Set(['setup', 'tenants', 'account', 'leads']);
+const SYSTEM_VIEWS = new Set(['setup', 'tenants', 'account', 'leads', 'settings']);
 
 /** تغيّر وصل أثناء الكتابة فأُجّل حتى تفرغ. */
 let pendingLive = false;
@@ -180,6 +175,28 @@ document.addEventListener('focusout', () => {
   pendingLive = false;
   void draw(document.querySelector('.page'));
 });
+
+/**
+ * التنقّل بتفويض واحد على الجذر لا بربط كل زر.
+ *
+ * الربط يقع عند الرسم، وأزرار الشاشة نفسها تُرسم **بعده** — فكانت
+ * بطاقات صفحة الإعدادات لا تفعل شيئاً عند الضغط. والتفويض يلتقط ما
+ * يُرسم لاحقاً بلا أن يعرف به أحد.
+ */
+root.addEventListener(
+  'click',
+  guard(async (event) => {
+    const button = event.target.closest('[data-view]');
+    if (!button || !root.contains(button)) return;
+
+    const next = button.dataset.view;
+    const leavingBranding = state.view === 'branding' && next !== 'branding';
+    state.view = next;
+    // معاينة الهوية تغيّر ألوان اللوحة قبل الحفظ؛ الخروج بلا حفظ يعيدها.
+    if (leavingBranding) await loadBranding(state.tenantId);
+    render();
+  }),
+);
 
 function render() {
   const views = visibleViews();
@@ -253,37 +270,6 @@ function render() {
 
   const main = root.querySelector('.page');
 
-  root.querySelectorAll('[data-view]').forEach((button) => {
-    button.onclick = guard(async () => {
-      const leavingBranding = state.view === 'branding' && button.dataset.view !== 'branding';
-      state.view = button.dataset.view;
-      // معاينة الهوية تغيّر ألوان اللوحة قبل الحفظ؛ الخروج بلا حفظ يعيدها.
-      if (leavingBranding) await loadBranding(state.tenantId);
-      render();
-    });
-  });
-
-  /**
-   * القائمة تُغلق بالضغط خارجها.
-   *
-   * وبلا ذلك تبقى مفتوحة فوق المحتوى، فيضغط الموظف ما تحتها ولا يحدث
-   * شيء — ويظنّ الشاشة متجمّدة.
-   */
-  const toggle = document.getElementById('settingsToggle');
-  const menu = document.getElementById('settingsMenu');
-  if (toggle && menu) {
-    toggle.onclick = (event) => {
-      event.stopPropagation();
-      menu.hidden = !menu.hidden;
-      toggle.setAttribute('aria-expanded', String(!menu.hidden));
-    };
-    document.addEventListener('click', () => {
-      menu.hidden = true;
-      toggle.setAttribute('aria-expanded', 'false');
-    });
-    menu.onclick = (event) => event.stopPropagation();
-  }
-
   const picker = document.getElementById('tenantPicker');
   if (picker) {
     picker.onchange = guard(async () => {
@@ -331,6 +317,11 @@ async function draw(main) {
     // قبل حارس «اختيار منشأة»: الطلب ليس لمنشأة بعد.
     if (state.view === 'leads') {
       await renderLeads(main);
+      return;
+    }
+
+    if (state.view === 'settings') {
+      await renderSettings(main, visibleViews().filter((v) => v.group === 'setup'));
       return;
     }
 
