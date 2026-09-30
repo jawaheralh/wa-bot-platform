@@ -38,7 +38,7 @@ import { MODULES } from '../modules/registry.ts';
 import { unwrapProvider } from '../whatsapp/provider.ts';
 import { errorMessage } from '../logger.ts';
 import { audit } from '../compliance.ts';
-import { hashPassword, findUser } from '../tenants.ts';
+import { hashPassword, findUserByIdentifier } from '../tenants.ts';
 import { createReset, consumeReset, invalidateAll, resetMessage } from '../password-reset.ts';
 import { getTenant, type TenantRow, type UserRow } from '../db/index.ts';
 import { sendEmail, emailEnabled } from '../email.ts';
@@ -272,7 +272,7 @@ export async function createServer(app: App): Promise<FastifyInstance> {
    */
   server.post('/api/forgot', async (request) => {
     const body = (request.body ?? {}) as { username?: string };
-    const username = String(body.username ?? '').trim();
+    const identifier = String(body.username ?? '').trim();
     checkLoginRate(request.ip);
 
     const same = {
@@ -282,11 +282,11 @@ export async function createServer(app: App): Promise<FastifyInstance> {
         : 'إن كان الحساب موجوداً ومسجَّلاً برقم جوال، وصلك رمز على واتساب.',
     };
 
-    const user = username ? findUser(db, username) : undefined;
+    const user = identifier ? findUserByIdentifier(db, identifier) : undefined;
     const reachable = Boolean(user?.wa_number || (user?.email && emailEnabled(config)));
     if (!user || !user.active || !reachable) {
       recordLoginFailure(request.ip);
-      logger.warn('طلب استرجاع لحساب غير صالح', { مستخدم: username, مصدر: request.ip });
+      logger.warn('طلب استرجاع لحساب غير صالح', { معرّف: identifier, مصدر: request.ip });
       return same;
     }
 
@@ -317,7 +317,7 @@ export async function createServer(app: App): Promise<FastifyInstance> {
       throw Object.assign(new Error('كلمة المرور يجب ألّا تقل عن ٨ أحرف.'), { statusCode: 400 });
     }
 
-    const user = findUser(db, String(body.username ?? '').trim());
+    const user = findUserByIdentifier(db, String(body.username ?? '').trim());
     // الرمز يُفحص حتى لو لم يوجد المستخدم، فلا يفرّق الزمن بين الحالتين.
     const outcome = user
       ? consumeReset(db, user.id, String(body.code ?? ''))

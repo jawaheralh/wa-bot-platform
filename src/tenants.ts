@@ -6,7 +6,7 @@
  */
 
 import bcrypt from 'bcryptjs';
-import { normalizeNumber, type Db, type TenantRow, type UserRow } from './db/index.ts';
+import { normalizeNumber, toInternational, type Db, type TenantRow, type UserRow } from './db/index.ts';
 import { ensureTenantModules } from './modules/registry.ts';
 import { normalizeHex } from './branding.ts';
 
@@ -116,4 +116,48 @@ export function findUser(db: Db, username: string): UserRow | undefined {
   return db.prepare('SELECT * FROM users WHERE username = ?').get(username.trim().toLowerCase()) as
     | UserRow
     | undefined;
+}
+
+/**
+ * يجد المستخدم باسمه أو ببريده أو بجواله.
+ *
+ * الموظف يتذكّر جواله وبريده ولا يتذكّر «rukn_ops_2». وإلزامه باسم
+ * المستخدم وحده يعني مكالمةً لمالكه في كل مرة ينساه — وهي مكالمة
+ * تتكرر أكثر من نسيان كلمة المرور نفسها.
+ *
+ * والشكل هو ما يحدّد الحقل: ما فيه «@» بريد، وما هو أرقام كلّه جوال،
+ * وما عداهما اسم مستخدم. فلا ثلاثة استعلامات لكل محاولة دخول.
+ *
+ * ## التكرار
+ *
+ * اسم المستخدم فريد في القاعدة، أما البريد والجوال فلا. ولو تصادف
+ * بريدان متطابقان لَمَا عرفنا أيَّ حسابٍ يُفتح — فيُرفض الاثنان.
+ * وإرجاع «الأول» في هذه الحالة يفتح حساب شخصٍ لمن يملك بيانات آخر.
+ */
+export function findUserByIdentifier(db: Db, identifier: string): UserRow | undefined {
+  const raw = identifier.trim();
+  if (!raw) return undefined;
+
+  if (raw.includes('@')) {
+    return single(db, 'SELECT * FROM users WHERE email = ?', raw.toLowerCase());
+  }
+
+  const digits = raw.replace(/[^\d]/g, '');
+  if (digits.length >= 8 && /^[\d\s+()-]+$/.test(raw)) {
+    /**
+     * الصيغتان معاً: الجديد يُخزَّن دولياً، وصفوفٌ حُفظت قبل ذلك
+     * بقيت كما كُتبت — ومن حُفظ رقمه «٠٥٥…» يجب أن يدخل به أيضاً.
+     */
+    const rows = db
+      .prepare('SELECT * FROM users WHERE wa_number IN (?, ?)')
+      .all(toInternational(digits), digits) as UserRow[];
+    return rows.length === 1 ? rows[0] : undefined;
+  }
+
+  return findUser(db, raw);
+}
+
+function single(db: Db, sql: string, value: string): UserRow | undefined {
+  const rows = db.prepare(sql).all(value) as UserRow[];
+  return rows.length === 1 ? rows[0] : undefined;
 }

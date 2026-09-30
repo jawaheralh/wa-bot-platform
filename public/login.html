@@ -80,11 +80,11 @@
     <form class="card box" id="form">
       <p class="kicker">أهلاً بك</p>
       <h1>دخول العملاء</h1>
-      <p class="muted">تسجيل الدخول لمتابعة محادثات المنشأة.</p>
+      <p class="muted">بالاسم أو البريد أو رقم الجوال — أيّها أسهل.</p>
 
       <div class="field">
         <input id="username" name="username" autocomplete="username" required autofocus placeholder=" ">
-        <label for="username">اسم المستخدم</label>
+        <label for="username">اسم المستخدم أو البريد أو الجوال</label>
       </div>
 
       <div class="field">
@@ -151,7 +151,7 @@
     forgot.onclick = async (event) => {
       event.preventDefault();
       if (!form.username.value.trim()) {
-        show('error', 'اكتب اسم المستخدم أولاً.');
+        show('error', 'اكتب اسم المستخدم أو البريد أو الجوال أولاً.');
         form.username.focus();
         return;
       }

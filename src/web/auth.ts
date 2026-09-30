@@ -10,7 +10,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 // الاستيراد لازم لأنواع الكوكي التي يضيفها الملحق لـrequest و reply.
 import '@fastify/cookie';
 import type { Role } from '../staff.ts';
-import { findUser, verifyPassword } from '../tenants.ts';
+import { findUserByIdentifier, verifyPassword } from '../tenants.ts';
 import type { Db, UserRow } from '../db/index.ts';
 import { can, PERMISSIONS } from '../permissions.ts';
 
@@ -111,12 +111,13 @@ export function readSession(db: Db, request: FastifyRequest): SessionUser | unde
   return toSession(user);
 }
 
-export function login(db: Db, username: string, password: string): UserRow {
-  const user = findUser(db, username);
-  // نفس الرسالة في الحالتين حتى لا نكشف أي أسماء مستخدمين موجودة.
+/** الدخول باسم المستخدم أو البريد أو الجوال — أيّها كتب. */
+export function login(db: Db, identifier: string, password: string): UserRow {
+  const user = findUserByIdentifier(db, identifier);
+  // نفس الرسالة في الحالتين حتى لا نكشف أي حسابات موجودة.
   // و401 لا 500: فشل الدخول حدث متوقع، ولو عاد 500 لاختلط بأعطال الخادم
   // في السجل والمراقبة، ولتعذّر بناء تحديد معدّل عليه لاحقاً.
-  const invalid = Object.assign(new Error('اسم المستخدم أو كلمة المرور غير صحيحة.'), { statusCode: 401 });
+  const invalid = Object.assign(new Error('بيانات الدخول غير صحيحة.'), { statusCode: 401 });
   if (!user) throw invalid;
   if (!verifyPassword(password, user.password_hash)) throw invalid;
   if (user.active === 0) {

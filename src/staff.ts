@@ -11,7 +11,7 @@
  * قاعدة المعرفة التي يتكلم بها البوت مع كل العملاء.
  */
 
-import { normalizeNumber, type Db, type UserRow } from './db/index.ts';
+import { toInternational, type Db, type UserRow } from './db/index.ts';
 import { permissionsOf, normalizePermissions } from './permissions.ts';
 import { hashPassword } from './tenants.ts';
 
@@ -72,6 +72,23 @@ export interface NewStaffInput {
   permissions?: string[];
 }
 
+/**
+ * البريد والجوال يصيران مفتاحَي دخول، فيجب أن يبقيا مميِّزَين.
+ *
+ * تكرارهما لا يكسر شيئاً في الحفظ، لكنه يُعطّل الدخول بهما للحسابين
+ * معاً: النظام لا يعرف أيَّهما يفتح فيرفض الاثنين. فالمنع هنا عند
+ * الكتابة أرحم من اكتشافه يوم يحتاج أحدهم الدخول.
+ */
+function ensureUnique(db: Db, column: 'email' | 'wa_number', value: string, exceptId?: number): void {
+  const taken = db
+    .prepare(`SELECT id FROM users WHERE ${column} = ? AND id != ?`)
+    .get(value, exceptId ?? 0) as { id: number } | undefined;
+  if (!taken) return;
+  throw new Error(
+    column === 'email' ? 'هذا البريد مستعمل لحساب آخر.' : 'هذا الرقم مستعمل لحساب آخر.',
+  );
+}
+
 export function addStaff(db: Db, input: NewStaffInput): StaffSummary {
   const username = input.username.trim().toLowerCase();
   if (username.length < 3) throw new Error('اسم المستخدم قصير جداً.');
@@ -79,6 +96,18 @@ export function addStaff(db: Db, input: NewStaffInput): StaffSummary {
     throw new Error('اسم المستخدم بحروف إنجليزية وأرقام فقط (ونقطة أو شرطة).');
   }
   if (input.password.length < 8) throw new Error('كلمة المرور يجب ألّا تقل عن ٨ أحرف.');
+
+  const email = input.email?.trim().toLowerCase() || null;
+  /**
+   * الرقم يُخزَّن دولياً لا كما كُتب.
+   *
+   * المالك يكتب «٠٥٥…» كما في دفتر هاتفه، وMeta لا تفهم إلا الصيغة
+   * الدولية — فالتنبيه لا يصل الموظف ولا يظهر الخطأ إلا حين لا يصل
+   * شيء. وهو أيضاً ما يجعل الدخول بالرقم يجد صاحبه.
+   */
+  const waNumber = input.waNumber ? toInternational(input.waNumber) : null;
+  if (email) ensureUnique(db, 'email', email);
+  if (waNumber) ensureUnique(db, 'wa_number', waNumber);
 
   const info = db
     .prepare(
@@ -91,8 +120,8 @@ export function addStaff(db: Db, input: NewStaffInput): StaffSummary {
       (input.displayName ?? username).trim(),
       hashPassword(input.password),
       input.role ?? 'agent',
-      input.waNumber ? normalizeNumber(input.waNumber) : null,
-      input.email?.trim().toLowerCase() || null,
+      waNumber,
+      email,
       normalizePermissions(input.permissions),
     );
 
@@ -135,6 +164,9 @@ export function updateStaff(
     }
   }
 
+  if (changes.email) ensureUnique(db, 'email', changes.email.trim().toLowerCase(), userId);
+  if (changes.waNumber) ensureUnique(db, 'wa_number', toInternational(changes.waNumber), userId);
+
   if (changes.password !== undefined) {
     if (changes.password.length < 8) throw new Error('كلمة المرور يجب ألّا تقل عن ٨ أحرف.');
     db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(changes.password), userId);
@@ -152,7 +184,7 @@ export function updateStaff(
   ).run(
     changes.displayName?.trim() || null,
     changes.waNumber === undefined ? 0 : 1,
-    changes.waNumber ? normalizeNumber(changes.waNumber) : null,
+    changes.waNumber ? toInternational(changes.waNumber) : null,
     changes.email === undefined ? 0 : 1,
     changes.email?.trim().toLowerCase() || null,
     changes.role ?? null,
