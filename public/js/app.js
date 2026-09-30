@@ -24,6 +24,7 @@ import { renderLeads } from './views/leads.js';
 import { renderBranding } from './views/branding.js';
 import { renderTemplates } from './views/templates.js';
 import { renderSatisfaction } from './views/satisfaction.js';
+import { renderBilling } from './views/billing.js';
 
 const VIEWS = [
   { id: 'overview', label: 'نظرة عامة', render: renderOverview },
@@ -38,11 +39,12 @@ const VIEWS = [
   { id: 'privacy', label: 'الخصوصية', render: renderPrivacy },
   { id: 'branding', label: 'الهوية', render: renderBranding },
   { id: 'templates', label: 'القوالب', render: renderTemplates },
+  { id: 'billing', label: 'استهلاك ميتا', render: renderBilling },
   { id: 'modules', label: 'الوحدات', render: renderModules },
 ];
 
 /** شاشات يراها مالك المنشأة وأدمن النظام دون الموظف. */
-const OWNER_ONLY = new Set(['knowledge', 'modules', 'privacy', 'branding', 'templates']);
+const OWNER_ONLY = new Set(['knowledge', 'modules', 'privacy', 'branding', 'templates', 'billing']);
 
 const root = document.getElementById('root');
 

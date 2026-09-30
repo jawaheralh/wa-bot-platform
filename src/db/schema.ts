@@ -272,4 +272,11 @@ export const CORE_COLUMNS: [table: string, column: string, definition: string][]
   ['usage_log', 'cache_read', 'INTEGER NOT NULL DEFAULT 0'],
   ['usage_log', 'cache_written', 'INTEGER NOT NULL DEFAULT 0'],
   ['usage_log', 'uncached', 'INTEGER NOT NULL DEFAULT 0'],
+  // استهلاك ميتا: عدد المحادثات المدفوعة وتكلفتها بالهللة.
+  ['usage_log', 'meta_conversations', 'INTEGER NOT NULL DEFAULT 0'],
+  ['usage_log', 'meta_halalas', 'INTEGER NOT NULL DEFAULT 0'],
+  // رصيد ميتا للمنشأة: المنحة الشهرية والسقف والأسعار.
+  ['tenants', 'meta_credit', 'INTEGER NOT NULL DEFAULT 0'],
+  ['tenants', 'meta_cap', 'INTEGER NOT NULL DEFAULT 0'],
+  ['tenants', 'meta_rates', 'TEXT'],
 ];

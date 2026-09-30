@@ -10,6 +10,7 @@ import type { App } from './app.ts';
 import { listTenants, getTenant } from './db/index.ts';
 import { getConfig } from './modules/registry.ts';
 import { closedToday, markAsked, type Closed } from './satisfaction.ts';
+import { checkBudget, recordConversation } from './billing.ts';
 import { hourNow } from './time.ts';
 
 /** القالب الذي يُرسل به السؤال — واحدٌ من الجاهزة في شاشة القوالب. */
@@ -61,6 +62,17 @@ export async function runRatingSurvey(app: App): Promise<void> {
     const settings = ratingSettings(app, tenant.id);
     if (!settings.enabled || settings.hour !== hour) continue;
 
+    /**
+     * السقف يُفحص مرة لكل منشأة لا لكل صفّ.
+     *
+     * وإن بلغته تُترك صفوفها كلها بلا تسجيل: لو سُجّلت كمسؤولة عنها
+     * لما سُئل عنها أحد أبداً بعد رفع السقف.
+     */
+    if (!checkBudget(app.db, tenant.id, 'utility').allowed) {
+      app.logger.warn('سقف ميتا بلغ حدّه — أُجّلت أسئلة التقييم', { tenant: tenant.id });
+      continue;
+    }
+
     for (const closed of closedToday(app.db, tenant.id)) {
       // التسجيل قبل الإرسال: سؤالٌ مكرر أسوأ من تقييم مفقود.
       const id = markAsked(app.db, tenant.id, closed);
@@ -72,6 +84,7 @@ export async function runRatingSurvey(app: App): Promise<void> {
           language: 'ar',
           variables: [closed.reference],
         });
+        recordConversation(app.db, tenant.id, 'utility');
         app.logger.info('أُرسل سؤال التقييم', {
           tenant: tenant.id,
           مرجع: closed.reference,

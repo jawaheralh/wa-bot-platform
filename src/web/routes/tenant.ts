@@ -40,9 +40,16 @@ import { listHandoffs, resolveHandoffs } from '../../modules/handoff.ts';
 import type { AppConfig } from '../../config.ts';
 import type { WhatsAppProvider } from '../../whatsapp/provider.ts';
 import { SQL_NOW } from '../../time.ts';
-import { requirePermission } from '../auth.ts';
+import { requirePermission, requireSystemAdmin } from '../auth.ts';
 import { parseFields, validateValues, readValues } from '../../case-fields.ts';
 import { summarize, listRatings } from '../../satisfaction.ts';
+import {
+  checkBudget,
+  recordConversation,
+  saveBilling,
+  summarize as summarizeBilling,
+  CATEGORY_AR as BILLING_CATEGORIES_AR,
+} from '../../billing.ts';
 import { PERMISSIONS } from '../../permissions.ts';
 import { readBranding, saveColors, storeLogo, removeLogo, readLogo, paletteFor } from '../../branding.ts';
 import { readProfile, updateProfile, setPhoto, VERTICALS } from '../../wa-profile.ts';
@@ -992,6 +999,37 @@ export function registerTenantRoutes(
    * الرقم يُقبل مباشرة لأن هذا هو الغرض: مراسلة من لم يراسلنا. وتُنشأ
    * له محادثة لتُحفظ الرسالة في مكانها بدل أن تضيع بلا أثر.
    */
+  /* --- رصيد ميتا واستهلاكه --- */
+
+  /** المالك يرى استهلاكه — وهو ما يُحاسَب عليه. */
+  app.get('/api/tenants/:tenantId/billing', async (request) => {
+    const id = adminOf(request);
+    return { ...summarizeBilling(db, id), categories: BILLING_CATEGORIES_AR };
+  });
+
+  /**
+   * المنحة والسقف والأسعار يضبطها أدمن النظام وحده.
+   *
+   * وهي شروط العقد لا إعداد تشغيل: مالكٌ يرفع سقف نفسه أو يمنح نفسه
+   * رصيداً يُلغي معنى الاتفاق.
+   */
+  app.put('/api/tenants/:tenantId/billing', async (request) => {
+    requireSystemAdmin(request as never);
+    const id = Number((request.params as Params).tenantId);
+    const body = (request.body ?? {}) as Record<string, unknown>;
+
+    const saved = saveBilling(db, id, { credit: body.credit, cap: body.cap, rates: body.rates });
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username,
+      action: 'billing_change',
+      detail: `منحة ${saved.credit} هللة · سقف ${saved.cap}`,
+      ip: request.ip,
+    });
+    return saved;
+  });
+
   /* --- رضا العملاء --- */
 
   app.get('/api/tenants/:tenantId/satisfaction', async (request) => {
@@ -1019,12 +1057,16 @@ export function registerTenantRoutes(
       .get(id, reference) as { reference: string; customer_wa: string; customer_name?: string } | undefined;
     if (!row) throw Object.assign(new Error('السجل غير موجود.'), { statusCode: 404 });
 
+    const budget = checkBudget(db, id, 'utility');
+    if (!budget.allowed) throw Object.assign(new Error(budget.reason!), { statusCode: 402 });
+
     const body = (request.body ?? {}) as { template?: string };
     await provider.sendTemplate(id, row.customer_wa, {
       name: String(body.template || 'request_reference'),
       language: 'ar',
       variables: [row.customer_name || 'عميلنا', row.reference],
     });
+    recordConversation(db, id, 'utility');
 
     audit(db, {
       tenantId: id,
@@ -1128,11 +1170,23 @@ export function registerTenantRoutes(
       throw Object.assign(new Error('متغيّرات القالب غير مكتملة.'), { statusCode: 400 });
     }
 
+    /**
+     * السقف يُفحص قبل الإرسال لا بعده.
+     *
+     * فحصٌ بعد الإرسال يعني أن المحادثة وقعت وحُوسب عليها، ثم أُخبرنا
+     * الموظف أنها ممنوعة — والمال أُنفق.
+     */
+    const budget = checkBudget(db, id, 'utility');
+    if (!budget.allowed) throw Object.assign(new Error(budget.reason!), { statusCode: 402 });
+
     const sent = await provider.sendTemplate(id, to, {
       name,
       language: String(body.language ?? 'ar'),
       variables,
     });
+
+    // بعد النجاح لا قبله: تسجيل ما لم يُرسل يُنقص رصيد العميل بلا مقابل.
+    recordConversation(db, id, 'utility');
 
     // تُحفظ باسم الموظفة: رسالة خرجت باسم المنشأة يجب أن يُعرف مرسلها.
     const conversation = getOrCreateConversation(db, id, to);
