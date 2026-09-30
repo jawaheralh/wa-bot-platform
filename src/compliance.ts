@@ -49,6 +49,7 @@ export const ACTION_AR: Record<string, string> = {
   case_created: 'تسجيل شكوى أو طلب يدوياً',
   template_created: 'إنشاء قالب واتساب',
   template_deleted: 'حذف قالب واتساب',
+  reference_sent: 'إرسال الرقم المرجعي للعميل',
   manual_reply: 'رد يدوي',
   assign: 'إسناد محادثة',
   bot_toggle: 'إيقاف/تشغيل البوت',

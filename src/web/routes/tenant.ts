@@ -42,6 +42,7 @@ import type { WhatsAppProvider } from '../../whatsapp/provider.ts';
 import { SQL_NOW } from '../../time.ts';
 import { requirePermission } from '../auth.ts';
 import { parseFields, validateValues, readValues } from '../../case-fields.ts';
+import { summarize, listRatings } from '../../satisfaction.ts';
 import { PERMISSIONS } from '../../permissions.ts';
 import { readBranding, saveColors, storeLogo, removeLogo, readLogo, paletteFor } from '../../branding.ts';
 import { readProfile, updateProfile, setPhoto, VERTICALS } from '../../wa-profile.ts';
@@ -991,6 +992,51 @@ export function registerTenantRoutes(
    * الرقم يُقبل مباشرة لأن هذا هو الغرض: مراسلة من لم يراسلنا. وتُنشأ
    * له محادثة لتُحفظ الرسالة في مكانها بدل أن تضيع بلا أثر.
    */
+  /* --- رضا العملاء --- */
+
+  app.get('/api/tenants/:tenantId/satisfaction', async (request) => {
+    const id = tenantOf(request);
+    return { summary: summarize(db, id), ratings: listRatings(db, id) };
+  });
+
+  /**
+   * إرسال الرقم المرجعي للعميل بقالب.
+   *
+   * الطلب المسجَّل يدوياً لا يعرف عنه العميل شيئاً، والمسجَّل من محادثة
+   * قد يمضي عليه يومان فتُغلق نافذته. فالقالب هو السبيل في الحالتين.
+   */
+  app.post('/api/tenants/:tenantId/cases/:kind/:reference/send-reference', async (request) => {
+    const id = allowed('templates')(request);
+    if (!provider.sendTemplate) {
+      throw Object.assign(new Error('المزوّد الحالي لا يدعم القوالب.'), { statusCode: 400 });
+    }
+
+    const { kind, reference } = request.params as Params & { kind: string; reference: string };
+    const table = kind === 'complaint' ? 'complaints' : 'requests';
+
+    const row = db
+      .prepare(`SELECT reference, customer_wa, customer_name FROM ${table} WHERE tenant_id = ? AND reference = ?`)
+      .get(id, reference) as { reference: string; customer_wa: string; customer_name?: string } | undefined;
+    if (!row) throw Object.assign(new Error('السجل غير موجود.'), { statusCode: 404 });
+
+    const body = (request.body ?? {}) as { template?: string };
+    await provider.sendTemplate(id, row.customer_wa, {
+      name: String(body.template || 'request_reference'),
+      language: 'ar',
+      variables: [row.customer_name || 'عميلنا', row.reference],
+    });
+
+    audit(db, {
+      tenantId: id,
+      userId: request.user?.id,
+      username: request.user?.username,
+      action: 'reference_sent',
+      target: row.reference,
+      ip: request.ip,
+    });
+    return { ok: true, message: 'أُرسل الرقم المرجعي للعميل.' };
+  });
+
   /* --- إنشاء القوالب وإدارتها --- */
 
   /**

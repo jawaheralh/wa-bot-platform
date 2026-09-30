@@ -56,7 +56,11 @@ export async function renderComplaints(main) {
                           .join('')}
                       </select>
                     </td>
-                    <td><button class="btn ghost small" data-edit="${c.id}">تعديل</button></td>
+                    <td>
+                      <button class="btn ghost small" data-edit="${c.id}">تعديل</button>
+                      <button class="btn ghost small" data-ref="${esc(c.reference)}"
+                              title="يُرسل للعميل رقم شكواه بقالب معتمد">إرسال الرقم</button>
+                    </td>
                   </tr>`,
                 )
                 .join('')}</tbody>
@@ -105,6 +109,16 @@ export async function renderComplaints(main) {
   }
 
   main.querySelector('#newCase').onclick = () => openForm(null);
+
+  main.querySelectorAll('[data-ref]').forEach((button) => {
+    button.onclick = guard(async () => {
+      const result = await post(
+        `/api/tenants/${state.tenantId}/cases/complaint/${button.dataset.ref}/send-reference`,
+        {},
+      );
+      flash(result.message);
+    });
+  });
 
   main.querySelectorAll('[data-edit]').forEach((button) => {
     button.onclick = () => openForm(list.find((c) => c.id === Number(button.dataset.edit)));

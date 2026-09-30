@@ -14,6 +14,7 @@ import { backupIfDue } from './backup.ts';
 import { watchTunnel } from './tunnel.ts';
 import { today } from './time.ts';
 import { runFollowups } from './followup.ts';
+import { runRatingSurvey } from './satisfaction-run.ts';
 import type { ClaudeClient } from './bot/claude.ts';
 
 const TICK_MS = 60_000;
@@ -73,6 +74,18 @@ export function startScheduler(app: App, claude?: ClaudeClient): () => void {
        * قبل مراقبة النفق: هذه تُرسل رسائل، وتلك قد تُعيد تشغيل النفق
        * فتُؤخّر النبضة. والمتابعة محكومة بوقت لا يُعوَّض.
        */
+      /**
+       * سؤال التقييم قبل المتابعة.
+       *
+       * كلاهما يرسل، والتقييم محكومٌ بساعةٍ واحدة في اليوم — فتأخيره
+       * خلف مهمة بطيئة قد يُفوّت تلك الساعة كلها.
+       */
+      try {
+        await runRatingSurvey(app);
+      } catch (error) {
+        deps.logger.error('تعذّر إرسال أسئلة التقييم', error);
+      }
+
       try {
         await runFollowups(app, claude);
       } catch (error) {

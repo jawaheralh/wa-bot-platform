@@ -90,6 +90,12 @@ interface RequestsConfig extends ModuleConfig {
    * «التسمية* | النوع | الخيارات». النجمة تعني إلزامياً.
    */
   fields: string;
+  /** سؤال العميل عن رضاه بعد إغلاق طلبه أو شكواه. */
+  ratingEnabled: boolean;
+  /** ساعة الإرسال بتوقيت الرياض — آخر اليوم بعد أن تكتمل الخدمة. */
+  ratingHour: number;
+  /** اسم القالب المعتمد الذي يُرسل به السؤال. */
+  ratingTemplate: string;
 }
 
 const DEFAULTS: RequestsConfig = {
@@ -97,6 +103,9 @@ const DEFAULTS: RequestsConfig = {
   kinds: [...KINDS],
   acknowledgement: 'راح نتواصل معك عند أي تحديث.',
   fields: '',
+  ratingEnabled: false,
+  ratingHour: 20,
+  ratingTemplate: 'service_rating',
 };
 
 /* ---------------------------------------------------------------
@@ -302,6 +311,12 @@ export const requestsModule: BotModule = {
     return {
       // يُعاد تدوير النصّ عبر المحلّل فيُصحَّح شكله ويُسقط المعطوب منه.
       fields: fieldsToText(parseFields(raw.fields)),
+      ratingEnabled: raw.ratingEnabled === true,
+      ratingHour:
+        Number.isFinite(Number(raw.ratingHour)) && Number(raw.ratingHour) >= 0 && Number(raw.ratingHour) <= 23
+          ? Number(raw.ratingHour)
+          : DEFAULTS.ratingHour,
+      ratingTemplate: String(raw.ratingTemplate || DEFAULTS.ratingTemplate).trim(),
       notifyCustomer: raw.notifyCustomer !== false,
       kinds,
       acknowledgement:

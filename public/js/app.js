@@ -23,6 +23,7 @@ import { renderTenantSetup } from './views/tenant-setup.js';
 import { renderLeads } from './views/leads.js';
 import { renderBranding } from './views/branding.js';
 import { renderTemplates } from './views/templates.js';
+import { renderSatisfaction } from './views/satisfaction.js';
 
 const VIEWS = [
   { id: 'overview', label: 'نظرة عامة', render: renderOverview },
@@ -32,6 +33,7 @@ const VIEWS = [
   { id: 'bookings', label: 'المواعيد', render: renderBookings, module: 'bookings' },
   { id: 'knowledge', label: 'قاعدة المعرفة', render: renderKnowledge },
   { id: 'training', label: 'تدريب البوت', render: renderTraining },
+  { id: 'satisfaction', label: 'رضا العملاء', render: renderSatisfaction },
   { id: 'staff', label: 'الموظفون', render: renderStaff },
   { id: 'privacy', label: 'الخصوصية', render: renderPrivacy },
   { id: 'branding', label: 'الهوية', render: renderBranding },

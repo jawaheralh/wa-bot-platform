@@ -30,6 +30,7 @@ import { claudeFor, recordUsage, recordCache } from '../tenant-claude.ts';
 import type { Transcriber } from '../stt/index.ts';
 import { storeMedia, isVisionImage, MAX_BYTES } from '../media.ts';
 import { MEDIA_AR } from '../whatsapp/provider.ts';
+import { pendingFor, readRating, recordRating, thanksFor } from '../satisfaction.ts';
 import { readFileSync } from 'node:fs';
 import { redact, restore, restoreDeep, mergeMaps } from '../redact.ts';
 
@@ -191,6 +192,40 @@ export function createEngine({ app, claude, transcriber }: EngineOptions): Engin
         });
         return;
       }
+    }
+
+    /**
+     * ردّ التقييم يُلتقط قبل البوت.
+     *
+     * لو مرّ على النموذج لأجاب عنه بجملة مجاملة وضاع الرقم — والسؤال
+     * أُرسل ليُقاس لا ليُجامَل. ويُلتقط حتى والبوت صامت: العميل سُئل،
+     * فردّه جوابٌ لسؤالنا لا محادثةٌ جديدة تحتاج موظفاً.
+     */
+    const survey = pendingFor(db, tenant.id, conversation.id);
+    if (survey) {
+      const rating = readRating(text);
+      if (rating !== null) {
+        recordRating(db, survey.id, rating, text);
+        convLogger.info('وصل تقييم', { تقدير: rating, مرجع: survey.reference });
+
+        const thanks = thanksFor(rating);
+        await provider.sendText(tenant.id, message.from, thanks);
+        saveMessage(db, conversation.id, 'bot', thanks);
+
+        // التقدير المنخفض حالةٌ تحتاج إنساناً لا رداً آلياً بعده.
+        if (rating <= 2) {
+          await notify(
+            tenant.id,
+            'handoff',
+            `تقييم منخفض: ${rating} من ٥`,
+            `المرجع: ${survey.reference}\nالرقم: ${message.from}\nما كتبه: ${text}`,
+            conversation.id,
+          );
+          silenceConversation(db, conversation.id, config.silentMinutes);
+        }
+        return;
+      }
+      // ردٌّ ليس رقماً: يُترك للبوت، ويبقى السؤال قائماً حتى تنتهي مهلته.
     }
 
     if (!botMayReply(db, conversation.id)) {

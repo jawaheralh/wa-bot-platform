@@ -53,6 +53,11 @@ export function fromEpochSeconds(seconds: number): string {
 }
 
 /** تاريخ اليوم بتوقيت الرياض: YYYY-MM-DD. */
+/** الساعة الآن بتوقيت الرياض — ٠ إلى ٢٣. */
+export function hourNow(date: Date = new Date()): number {
+  return Number(now(date).slice(11, 13));
+}
+
 export function today(offsetDays = 0, date: Date = new Date()): string {
   const shifted = new Date(date.getTime() + offsetDays * 86_400_000);
   return now(shifted).slice(0, 10);

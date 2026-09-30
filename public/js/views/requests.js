@@ -69,7 +69,11 @@ export async function renderRequests(main) {
                           .join('')}
                       </select>
                     </td>
-                    <td><button class="btn ghost small" data-edit="${r.id}">تعديل</button></td>
+                    <td>
+                      <button class="btn ghost small" data-edit="${r.id}">تعديل</button>
+                      <button class="btn ghost small" data-ref="${esc(r.reference)}"
+                              title="يُرسل للعميل رقم طلبه بقالب معتمد">إرسال الرقم</button>
+                    </td>
                   </tr>`,
                 )
                 .join('')}</tbody>
@@ -120,6 +124,16 @@ export async function renderRequests(main) {
   }
 
   main.querySelector('#newCase').onclick = () => openForm(null);
+
+  main.querySelectorAll('[data-ref]').forEach((button) => {
+    button.onclick = guard(async () => {
+      const result = await post(
+        `/api/tenants/${state.tenantId}/cases/request/${button.dataset.ref}/send-reference`,
+        {},
+      );
+      flash(result.message);
+    });
+  });
 
   main.querySelectorAll('[data-edit]').forEach((button) => {
     button.onclick = () => openForm(requests.find((r) => r.id === Number(button.dataset.edit)));

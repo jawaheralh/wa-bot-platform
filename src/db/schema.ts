@@ -8,6 +8,7 @@
  */
 
 import { SQL_NOW } from '../time.ts';
+import { TABLE as SATISFACTION_TABLE, INDEX as SATISFACTION_INDEX } from '../satisfaction.ts';
 
 export const CORE_TABLES: string[] = [
   /* --- المنشآت: كل صف عميل يدفع اشتراكاً --- */
@@ -201,6 +202,10 @@ export const CORE_TABLES: string[] = [
     created_at TEXT    NOT NULL DEFAULT (${SQL_NOW})
   )`,
   `CREATE INDEX IF NOT EXISTS idx_resets_user ON password_resets(user_id, used_at)`,
+
+  /* --- تقييم رضا العملاء بعد إغلاق الطلب أو الشكوى --- */
+  SATISFACTION_TABLE,
+  SATISFACTION_INDEX,
 ];
 
 
