@@ -68,6 +68,7 @@ export interface AppConfig {
   /** رقم الدعم الذي يظهر لأدمن المنشأة عند الوحدات المعطّلة. */
   supportWhatsApp: string;
   platformWaTenant: number | null;
+  email: { provider: string; apiKey: string; from: string; fromName: string };
   anthropicApiKey: string;
   anthropicModel: string;
   /** تحويل الرسائل الصوتية لنص — يُعطَّل تلقائياً إذا لم يوجد مفتاح. */
@@ -178,6 +179,12 @@ export function loadConfig(): AppConfig {
      * الفارغ يعني «اختر أول منشأة تستطيع الإرسال».
      */
     platformWaTenant: num('PLATFORM_WA_TENANT', 0) || null,
+    email: {
+      provider: str('EMAIL_PROVIDER', 'resend'),
+      apiKey: str('EMAIL_API_KEY'),
+      from: str('EMAIL_FROM'),
+      fromName: str('EMAIL_FROM_NAME'),
+    },
     anthropicApiKey: str('ANTHROPIC_API_KEY'),
     anthropicModel: str('ANTHROPIC_MODEL', 'claude-sonnet-5'),
     transcription: {

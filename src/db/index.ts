@@ -135,6 +135,7 @@ export interface UserRow {
   password_hash: string;
   role: 'system' | 'tenant' | 'agent';
   wa_number: string | null;
+  email: string | null;
   active: number;
   totp_secret: string | null;
   totp_enabled: number;

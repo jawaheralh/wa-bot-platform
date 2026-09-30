@@ -19,6 +19,8 @@ const HINTS = {
   ANTHROPIC_API_KEY: 'console.anthropic.com ← API Keys. بدونه لن يرد البوت.',
   OPENAI_API_KEY: 'اختياري — لتحويل الرسائل الصوتية لنص.',
   SUPPORT_WHATSAPP: 'يظهر لعملائك عند الوحدات المعطّلة.',
+  EMAIL_API_KEY: 'resend.com أو brevo.com — قناة استرجاع أرخص من واتساب.',
+  EMAIL_FROM: 'البريد المُرسِل، على نطاق موثّق لدى المزوّد.',
   PUBLIC_URL: 'عنوان HTTPS العام. Cloud API لا يستقبل بدونه.',
 };
 

@@ -40,7 +40,8 @@ import { errorMessage } from '../logger.ts';
 import { audit } from '../compliance.ts';
 import { hashPassword, findUser } from '../tenants.ts';
 import { createReset, consumeReset, invalidateAll, resetMessage } from '../password-reset.ts';
-import { getTenant, type TenantRow } from '../db/index.ts';
+import { getTenant, type TenantRow, type UserRow } from '../db/index.ts';
+import { sendEmail, emailEnabled } from '../email.ts';
 import { credentialsFor } from '../tenant-meta.ts';
 
 export async function createServer(app: App): Promise<FastifyInstance> {
@@ -197,13 +198,37 @@ export async function createServer(app: App): Promise<FastifyInstance> {
    * رقم مطعمه لا من رقم غريب هي نصف الثقة. وأدمن النظام بلا منشأة،
    * فيُرسل له من أول منشأة موصولة.
    */
-  async function sendResetCode(app: App, user: { tenant_id: number | null; wa_number: string | null }, code: string) {
+  async function sendResetCode(app: App, user: UserRow, code: string) {
     const tenantId = user.tenant_id ?? platformSender();
-    if (!tenantId) throw new Error('لا توجد منشأة موصولة لإرسال الرمز منها.');
-
-    const tenant = getTenant(db, tenantId);
+    const tenant = tenantId ? getTenant(db, tenantId) : undefined;
     const brand = user.tenant_id ? (tenant?.name ?? config.brandName) : config.brandName;
-    await app.provider.sendText(tenantId, user.wa_number!, resetMessage(code, brand));
+    const text = resetMessage(code, brand);
+
+    /**
+     * البريد أولاً حين يكون مضبوطاً.
+     *
+     * لأنه أرخص: رسائل الاسترجاع بالعشرات شهرياً وهي داخل الطبقة
+     * المجانية لمزوّدي البريد، بينما كل رمز على واتساب محادثةٌ
+     * تُحاسِب عليها Meta. والواتساب يبقى للجميع لأن كثيراً من
+     * الموظفين بلا بريد عمل أصلاً.
+     */
+    if (user.email && emailEnabled(config)) {
+      const sent = await sendEmail(config, {
+        to: user.email,
+        subject: `رمز استرجاع كلمة المرور — ${brand}`,
+        text,
+      });
+      if (sent.ok) return 'بريد';
+      logger.warn('تعذّر إرسال الرمز بالبريد، والمحاولة بواتساب', { سبب: sent.message });
+    }
+
+    if (user.wa_number) {
+      if (!tenantId) throw new Error('لا توجد منشأة موصولة لإرسال الرمز منها.');
+      await app.provider.sendText(tenantId, user.wa_number, text);
+      return 'واتساب';
+    }
+
+    throw new Error('لا بريد ولا رقم جوال لهذا الحساب.');
   }
 
   /**
@@ -252,11 +277,14 @@ export async function createServer(app: App): Promise<FastifyInstance> {
 
     const same = {
       ok: true,
-      message: 'إن كان الحساب موجوداً ومسجَّلاً برقم جوال، وصلك رمز على واتساب.',
+      message: emailEnabled(config)
+        ? 'إن كان الحساب موجوداً، وصلك رمز على بريده أو على واتساب.'
+        : 'إن كان الحساب موجوداً ومسجَّلاً برقم جوال، وصلك رمز على واتساب.',
     };
 
     const user = username ? findUser(db, username) : undefined;
-    if (!user || !user.active || !user.wa_number) {
+    const reachable = Boolean(user?.wa_number || (user?.email && emailEnabled(config)));
+    if (!user || !user.active || !reachable) {
       recordLoginFailure(request.ip);
       logger.warn('طلب استرجاع لحساب غير صالح', { مستخدم: username, مصدر: request.ip });
       return same;
@@ -264,8 +292,8 @@ export async function createServer(app: App): Promise<FastifyInstance> {
 
     const { code } = createReset(db, user);
     try {
-      await sendResetCode(app, user, code);
-      logger.info('أُرسل رمز استرجاع', { مستخدم: user.username });
+      const channel = await sendResetCode(app, user, code);
+      logger.info('أُرسل رمز استرجاع', { مستخدم: user.username, قناة: channel });
     } catch (error) {
       // الفشل لا يُقال للطالب: إخباره أن الإرسال فشل يخبره أن الحساب موجود.
       logger.error('تعذّر إرسال رمز الاسترجاع', error, { مستخدم: user.username });

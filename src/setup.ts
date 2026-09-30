@@ -198,6 +198,21 @@ const FIELDS: Field[] = [
       v.trim() === '' || /^\d{10,15}$/.test(v.replace(/\D/g, '')) ? null : 'رقم غير صالح.',
   },
   {
+    key: 'EMAIL_API_KEY',
+    label: 'مفتاح مزوّد البريد (اختياري)',
+    hint: 'resend.com أو brevo.com — الطبقة المجانية تكفي رسائل الاسترجاع. يلزم نطاق موثّق.',
+    secret: true,
+    optional: true,
+  },
+  {
+    key: 'EMAIL_FROM',
+    label: 'البريد المُرسِل (اختياري)',
+    hint: 'مثل noreply@yourdomain.sa — على نطاق موثّق لدى المزوّد.',
+    optional: true,
+    validate: (v) =>
+      v.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()) ? null : 'بريد غير صالح.',
+  },
+  {
     key: 'OPENAI_API_KEY',
     label: 'مفتاح OpenAI (اختياري)',
     hint: 'لتحويل الرسائل الصوتية لنص. يُترك فارغاً لتعطيل الميزة.',

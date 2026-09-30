@@ -20,8 +20,8 @@ export async function renderStaff(main) {
     <div class="card">
       <div class="table-wrap"><table>
         <thead><tr>
-          <th>الاسم</th><th>المستخدم</th><th>الدور</th><th>الصلاحيات</th><th>رقم التنبيهات</th>
-          <th>ردود</th><th>الحالة</th>${isOwner ? '<th></th>' : ''}
+          <th>الاسم</th><th>المستخدم</th><th>الدور</th><th>الصلاحيات</th>
+          <th>رقم التنبيهات</th><th>البريد</th><th>ردود</th><th>الحالة</th>${isOwner ? '<th></th>' : ''}
         </tr></thead>
         <tbody>${staff
           .map(
@@ -50,6 +50,11 @@ export async function renderStaff(main) {
                   ? `<input class="num" data-wa="${s.id}" dir="ltr" value="${esc(s.waNumber ?? '')}" placeholder="9665…">`
                   : `<span class="num">${esc(s.waNumber ?? '—')}</span>`
               }</td>
+              <td>${
+                isOwner
+                  ? `<input data-email="${s.id}" dir="ltr" value="${esc(s.email ?? '')}" placeholder="name@company.sa">`
+                  : esc(s.email ?? '—')
+              }</td>
               <td class="num">${s.replies}</td>
               <td>${s.active ? '<span class="badge green">نشط</span>' : '<span class="badge grey">معطَّل</span>'}</td>
               ${
@@ -73,6 +78,7 @@ export async function renderStaff(main) {
       </table></div>
       <p class="muted" style="margin-top:10px">
         الحساب يُعطَّل ولا يُحذف، حتى تبقى ردوده السابقة منسوبة له في سجل المحادثات.
+        <br>والرقم أو البريد شرطٌ لاسترجاع كلمة المرور — من ليس له أيٌّ منهما لا يستطيع استرجاعها بنفسه.
       </p>
     </div>
 
@@ -98,7 +104,8 @@ export async function renderStaff(main) {
               <div><label for="password">كلمة المرور</label><input id="password" type="password" placeholder="٨ أحرف فأكثر"></div>
             </div>
             <div class="row">
-              <div><label for="waNumber">رقم جواله للتنبيهات (اختياري)</label><input id="waNumber" dir="ltr" placeholder="966501234567"></div>
+              <div><label for="waNumber">رقم جواله للتنبيهات</label><input id="waNumber" dir="ltr" placeholder="966501234567"></div>
+              <div><label for="email">بريده</label><input id="email" dir="ltr" placeholder="name@company.sa"></div>
               <div><label for="role">الصلاحية</label>
                 <select id="role"><option value="agent">موظف</option><option value="tenant">مالك المنشأة</option></select>
               </div>
@@ -129,6 +136,7 @@ export async function renderStaff(main) {
       username: value('username'),
       password: document.getElementById('password').value,
       waNumber: value('waNumber'),
+      email: value('email'),
       role: value('role'),
       permissions: [...document.querySelectorAll('[data-new-perm]:checked')].map((box) => box.dataset.newPerm),
     });
@@ -141,6 +149,7 @@ export async function renderStaff(main) {
       const id = button.dataset.save;
       await patch(`/api/tenants/${state.tenantId}/staff/${id}`, {
         waNumber: main.querySelector(`[data-wa="${id}"]`).value.trim(),
+        email: main.querySelector(`[data-email="${id}"]`).value.trim(),
         role: main.querySelector(`[data-role="${id}"]`)?.value,
       });
       flash('حُفظ.');

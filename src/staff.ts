@@ -30,6 +30,7 @@ export interface StaffSummary {
   displayName: string;
   role: Role;
   waNumber: string | null;
+  email: string | null;
   active: boolean;
   createdAt: string;
   /** عدد الردود التي كتبها، لأن الحذف ممنوع وهذا يفسّر سبب بقاء المعطَّل. */
@@ -51,6 +52,7 @@ export function listStaff(db: Db, tenantId: number): StaffSummary[] {
     displayName: row.display_name,
     role: row.role as Role,
     waNumber: row.wa_number,
+    email: row.email,
     active: row.active === 1,
     createdAt: row.created_at,
     replies: row.replies,
@@ -64,6 +66,7 @@ export interface NewStaffInput {
   password: string;
   displayName?: string;
   waNumber?: string;
+  email?: string;
   role?: 'tenant' | 'agent';
   /** صلاحيات الموظف. غيابها يعني الافتراضي. */
   permissions?: string[];
@@ -79,8 +82,8 @@ export function addStaff(db: Db, input: NewStaffInput): StaffSummary {
 
   const info = db
     .prepare(
-      `INSERT INTO users (tenant_id, username, display_name, password_hash, role, wa_number, active, permissions)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
+      `INSERT INTO users (tenant_id, username, display_name, password_hash, role, wa_number, email, active, permissions)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
     )
     .run(
       input.tenantId,
@@ -89,6 +92,7 @@ export function addStaff(db: Db, input: NewStaffInput): StaffSummary {
       hashPassword(input.password),
       input.role ?? 'agent',
       input.waNumber ? normalizeNumber(input.waNumber) : null,
+      input.email?.trim().toLowerCase() || null,
       normalizePermissions(input.permissions),
     );
 
@@ -110,6 +114,7 @@ export function updateStaff(
   changes: {
     displayName?: string;
     waNumber?: string | null;
+    email?: string | null;
     role?: 'tenant' | 'agent';
     active?: boolean;
     password?: string;
@@ -139,6 +144,7 @@ export function updateStaff(
     `UPDATE users SET
        display_name = COALESCE(?, display_name),
        wa_number    = CASE WHEN ? THEN ? ELSE wa_number END,
+       email        = CASE WHEN ? THEN ? ELSE email END,
        role         = COALESCE(?, role),
        active       = COALESCE(?, active),
        permissions  = CASE WHEN ? THEN ? ELSE permissions END
@@ -147,6 +153,8 @@ export function updateStaff(
     changes.displayName?.trim() || null,
     changes.waNumber === undefined ? 0 : 1,
     changes.waNumber ? normalizeNumber(changes.waNumber) : null,
+    changes.email === undefined ? 0 : 1,
+    changes.email?.trim().toLowerCase() || null,
     changes.role ?? null,
     changes.active === undefined ? null : changes.active ? 1 : 0,
     changes.permissions === undefined ? 0 : 1,

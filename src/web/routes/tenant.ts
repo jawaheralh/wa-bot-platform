@@ -497,6 +497,7 @@ export function registerTenantRoutes(
       password: body.password ?? '',
       displayName: body.displayName,
       waNumber: body.waNumber,
+      email: body.email,
       role: body.role === 'tenant' ? 'tenant' : 'agent',
       permissions: Array.isArray((request.body as { permissions?: unknown }).permissions)
         ? ((request.body as { permissions: string[] }).permissions)
@@ -518,6 +519,7 @@ export function registerTenantRoutes(
     return updateStaff(db, id, userId, {
       displayName: typeof body.displayName === 'string' ? body.displayName : undefined,
       waNumber: body.waNumber === undefined ? undefined : String(body.waNumber ?? ''),
+      email: body.email === undefined ? undefined : String(body.email ?? ''),
       role: body.role === 'tenant' || body.role === 'agent' ? body.role : undefined,
       active: typeof body.active === 'boolean' ? body.active : undefined,
       password: typeof body.password === 'string' && body.password ? body.password : undefined,

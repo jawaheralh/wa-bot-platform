@@ -214,6 +214,8 @@ export const CORE_TABLES: string[] = [
  */
 export const CORE_COLUMNS: [table: string, column: string, definition: string][] = [
   ['users', 'wa_number', 'TEXT'],
+  // بريد المستخدم — قناة استرجاع ثانية لمن لا رقم له.
+  ['users', 'email', 'TEXT'],
   ['users', 'active', 'INTEGER NOT NULL DEFAULT 1'],
   // التحقق بخطوتين: السرّ يبقى محفوظاً بعد التعطيل ليعاد التفعيل بلا
   // إعداد جديد، والراية وحدها هي التي تقرّر.
